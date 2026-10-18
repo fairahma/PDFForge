@@ -16,6 +16,9 @@ import android.view.ViewGroup
 import android.widget.*
 import java.io.File
 import java.io.FileOutputStream
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.multipdf.PDFMergerUtility
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import kotlin.concurrent.thread
 
 class MainActivity : Activity() {
@@ -29,6 +32,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        PDFBoxResourceLoader.init(applicationContext)
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(28, 40, 28, 24)
@@ -40,7 +44,7 @@ class MainActivity : Activity() {
         listOf(
             "Images to PDF" to "images",
             "Merge PDFs" to "merge",
-            "Split PDF into pages" to "split",
+            "Extract first PDF page" to "split",
             "Compress PDF (image-based)" to "compress"
         ).forEach { (title, op) ->
             layout.addView(Button(this).apply {
@@ -84,8 +88,8 @@ class MainActivity : Activity() {
                     val file = File(cacheDir, "pdf_forge_${System.currentTimeMillis()}.pdf")
                     when (operation) {
                         "images" -> imagesToPdf(uris, file)
-                        "merge" -> renderToPdf(uris, file, 100, false)
-                        "split" -> renderToPdf(uris, file, 100, true)
+                        "merge" -> mergePdfs(uris, file)
+                        "split" -> extractFirstPage(uris, file)
                         "compress" -> renderToPdf(uris, file, 55, false)
                     }
                     result = file
@@ -109,6 +113,44 @@ class MainActivity : Activity() {
             type = "application/pdf"
             putExtra(Intent.EXTRA_TITLE, "PDFForge_${System.currentTimeMillis()}.pdf")
         }, saveCode)
+    }
+
+    private fun mergePdfs(uris: List<Uri>, output: File) {
+        require(uris.size >= 2) { "Select at least two PDFs." }
+        val merger = PDFMergerUtility()
+        merger.destinationFileName = output.absolutePath
+        val temporary = mutableListOf<File>()
+        try {
+            uris.forEach { uri ->
+                val source = File.createTempFile("merge_", ".pdf", cacheDir)
+                temporary.add(source)
+                contentResolver.openInputStream(uri)?.use { input ->
+                    source.outputStream().use { input.copyTo(it) }
+                } ?: error("Unable to read PDF")
+                merger.addSource(source)
+            }
+            merger.mergeDocuments(null)
+        } finally {
+            temporary.forEach { it.delete() }
+        }
+    }
+
+    private fun extractFirstPage(uris: List<Uri>, output: File) {
+        val source = File.createTempFile("split_", ".pdf", cacheDir)
+        try {
+            contentResolver.openInputStream(uris.first())?.use { input ->
+                source.outputStream().use { input.copyTo(it) }
+            } ?: error("Unable to read PDF")
+            PDDocument.load(source).use { original ->
+                require(original.numberOfPages > 0) { "PDF has no pages" }
+                PDDocument().use { extracted ->
+                    extracted.importPage(original.getPage(0))
+                    extracted.save(output)
+                }
+            }
+        } finally {
+            source.delete()
+        }
     }
 
     private fun imagesToPdf(uris: List<Uri>, file: File) {
