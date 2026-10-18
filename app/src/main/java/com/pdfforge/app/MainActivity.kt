@@ -29,6 +29,7 @@ class MainActivity : Activity() {
     private var result: File? = null
     private lateinit var status: TextView
     private lateinit var saveButton: Button
+    private lateinit var previewButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,6 +58,8 @@ class MainActivity : Activity() {
         layout.addView(status)
         saveButton = Button(this).apply { text = "Save result"; isEnabled = false; setOnClickListener { saveResult() } }
         layout.addView(saveButton)
+        previewButton = Button(this).apply { text = "Preview result"; isEnabled = false; setOnClickListener { result?.let { showPdfPreview(it) } } }
+        layout.addView(previewButton)
         val scroll = ScrollView(this)
         scroll.addView(layout)
         setContentView(scroll)
@@ -83,6 +86,7 @@ class MainActivity : Activity() {
             if (uris.isEmpty()) return
             status.text = "Processing ${uris.size} file(s)…"
             saveButton.isEnabled = false
+            previewButton.isEnabled = false
             thread {
                 try {
                     val file = File(cacheDir, "pdf_forge_${System.currentTimeMillis()}.pdf")
@@ -93,7 +97,7 @@ class MainActivity : Activity() {
                         "compress" -> renderToPdf(uris, file, 55, false)
                     }
                     result = file
-                    runOnUiThread { status.text = "Ready: ${file.length() / 1024} KB. Tap Save result."; saveButton.isEnabled = true }
+                    runOnUiThread { status.text = "Ready: ${file.length() / 1024} KB. Tap Save result."; saveButton.isEnabled = true; previewButton.isEnabled = true }
                 } catch (e: Exception) {
                     runOnUiThread { status.text = "Failed: ${e.message}" }
                 }
@@ -105,6 +109,74 @@ class MainActivity : Activity() {
                 status.text = "PDF saved successfully."
             } catch (e: Exception) { status.text = "Save failed: ${e.message}" }
         }
+    }
+
+    private fun showPdfPreview(file: File) {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(16, 12, 16, 12)
+        }
+        val image = ImageView(this).apply {
+            adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }
+        val pageLabel = TextView(this).apply { gravity = Gravity.CENTER; textSize = 16f }
+        val navigation = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val previous = Button(this).apply { text = "Previous" }
+        val next = Button(this).apply { text = "Next" }
+        navigation.addView(previous, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        navigation.addView(next, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        container.addView(pageLabel)
+        container.addView(image, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        container.addView(navigation)
+        val dialog = android.app.AlertDialog.Builder(this)
+            .setTitle("PDF result preview")
+            .setView(container)
+            .setPositiveButton("Save") { _, _ -> saveResult() }
+            .setNegativeButton("Close", null)
+            .create()
+        dialog.show()
+        dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, (resources.displayMetrics.heightPixels * 0.85).toInt())
+        var pageIndex = 0
+        var request = 0
+        fun renderPage() {
+            val token = ++request
+            val index = pageIndex
+            pageLabel.text = "Loading page ${index + 1}..."
+            thread {
+                try {
+                    ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+                        PdfRenderer(fd).use { renderer ->
+                            val total = renderer.pageCount
+                            require(total > 0) { "Empty PDF" }
+                            renderer.openPage(index).use { page ->
+                                val scale = minOf(2f, 1200f / page.width)
+                                val bitmap = Bitmap.createBitmap(
+                                    (page.width * scale).toInt().coerceAtLeast(1),
+                                    (page.height * scale).toInt().coerceAtLeast(1),
+                                    Bitmap.Config.ARGB_8888
+                                )
+                                bitmap.eraseColor(Color.WHITE)
+                                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                runOnUiThread {
+                                    if (dialog.isShowing && token == request) {
+                                        image.setImageBitmap(bitmap)
+                                        pageLabel.text = "Page ${index + 1} of $total"
+                                        previous.isEnabled = index > 0
+                                        next.isEnabled = index < total - 1
+                                    } else bitmap.recycle()
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread { if (dialog.isShowing && token == request) pageLabel.text = "Preview unavailable: ${e.message}" }
+                }
+            }
+        }
+        previous.setOnClickListener { if (pageIndex > 0) { pageIndex--; renderPage() } }
+        next.setOnClickListener { pageIndex++; renderPage() }
+        renderPage()
     }
 
     private fun saveResult() {
