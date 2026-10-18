@@ -65,7 +65,7 @@ class MainActivity : Activity() {
                 }
             }
             card.addView(TextView(this).apply { text = title; textSize = 19f; setTextColor(Color.rgb(23, 60, 103)) })
-            card.addView(TextView(this).apply { text = subtitle; textSize = 13f; setTextColor(Color.DKGRAY }))
+            card.addView(TextView(this).apply { text = subtitle; textSize = 13f; setTextColor(Color.DKGRAY) })
             return card
         }
         layout.addView(TextView(this).apply { text = "PDFForge"; textSize = 34f; setTextColor(Color.rgb(23, 60, 103)); setPadding(0, 0, 0, 8) })
