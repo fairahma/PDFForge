@@ -28,6 +28,7 @@ import java.util.zip.ZipOutputStream
 class ToolActivity : Activity() {
     private val pickCode = 10
     private val saveCode = 11
+    private val splitFolderCode = 12
     private var operation = ""
     private var selected = emptyList<Uri>()
     private var result: File? = null
@@ -104,7 +105,7 @@ class ToolActivity : Activity() {
             setOnClickListener { if (operation.isNotEmpty()) chooseFiles() else status.text = "Choose a tool above first." }
         })
         layout.addView(workspace, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 14; bottomMargin = 12 })
-        runButton = Button(this).apply { text = "Create PDF"; isEnabled = false; setOnClickListener { processFiles() } }
+        runButton = Button(this).apply { text = if (operation == "split") "Split into folder" else "Create PDF"; isEnabled = false; setOnClickListener { if (operation == "split") chooseSplitFolder() else processFiles() } }
         runButton.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(242, 90, 96))
         runButton.setTextColor(Color.WHITE)
         layout.addView(runButton)
@@ -113,7 +114,8 @@ class ToolActivity : Activity() {
             inputType = android.text.InputType.TYPE_CLASS_TEXT
             setSingleLine(true)
         }
-        pagesInput.visibility = android.view.View.GONE
+        pagesInput.visibility = if (operation == "split") android.view.View.VISIBLE else android.view.View.GONE
+        if (operation == "split") pagesInput.hint = "Split after pages, e.g. 5,12 (20 pages → 1-5, 6-12, 13-20)"
         layout.addView(pagesInput)
 
         status = TextView(this).apply { text = "Choose a tool to begin."; textSize = 15f; setPadding(0, 30, 0, 16) }
@@ -151,6 +153,9 @@ class ToolActivity : Activity() {
             showSelectedFiles()
             runButton.isEnabled = true
             status.text = "Review files and tap Process selected files."
+        } else if (requestCode == splitFolderCode) {
+            val folder = data.data ?: return
+            splitIntoFolder(folder)
         } else if (requestCode == saveCode) {
             val file = result ?: return
             try {
@@ -268,6 +273,52 @@ class ToolActivity : Activity() {
             } catch (e: Exception) {
                 runOnUiThread { status.text = "Cannot preview: ${e.message}" }
             }
+        }
+    }
+
+    private fun chooseSplitFolder() {
+        if (selected.isEmpty()) return
+        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), splitFolderCode)
+    }
+
+    private fun splitIntoFolder(folder: Uri) {
+        val uri = selected.firstOrNull() ?: return
+        val boundaries = pagesInput.text.toString()
+        runButton.isEnabled = false
+        status.text = "Creating split PDFs..."
+        thread {
+            val source = copySource(uri)
+            try {
+                val folderDoc = androidx.documentfile.provider.DocumentFile.fromTreeUri(this, folder)
+                    ?: error("Cannot access chosen folder")
+                PDDocument.load(source).use { original ->
+                    val total = original.numberOfPages
+                    require(total > 1) { "PDF must have at least two pages" }
+                    require(boundaries.isNotBlank()) { "Enter at least one split point, e.g. 5,12" }
+                    val cuts = boundaries.split(",").map {
+                        it.trim().toIntOrNull() ?: error("Invalid split point: $it")
+                    }
+                    require(cuts == cuts.distinct().sorted() && cuts.all { it in 1 until total }) {
+                        "Split points must be unique, ascending, and between 1 and ${total - 1}"
+                    }
+                    val ends = cuts + total
+                    var start = 0
+                    ends.forEachIndexed { partIndex, end ->
+                        val name = "PDFForge_part_${partIndex + 1}_pages_${start + 1}-$end.pdf"
+                        val dest = folderDoc.createFile("application/pdf", name)
+                            ?: error("Cannot create $name")
+                        PDDocument().use { part ->
+                            for (i in start until end) part.importPage(original.getPage(i))
+                            contentResolver.openOutputStream(dest.uri)?.use { part.save(it) }
+                                ?: error("Cannot write $name")
+                        }
+                        start = end
+                    }
+                    runOnUiThread { status.text = "Saved ${ends.size} PDFs to your chosen folder."; runButton.isEnabled = true }
+                }
+            } catch (e: Exception) {
+                runOnUiThread { status.text = "Split failed: ${e.message}"; runButton.isEnabled = true }
+            } finally { source.delete() }
         }
     }
 
