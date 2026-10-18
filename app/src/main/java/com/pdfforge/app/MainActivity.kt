@@ -12,6 +12,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.view.Gravity
+import android.graphics.drawable.GradientDrawable
+import android.provider.OpenableColumns
 import android.view.ViewGroup
 import android.widget.*
 import java.io.File
@@ -34,6 +36,8 @@ class MainActivity : Activity() {
     private lateinit var previewButton: Button
     private lateinit var pagesInput: EditText
     private var resultIsZip = false
+    private lateinit var filesPanel: LinearLayout
+    private lateinit var runButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,22 +47,43 @@ class MainActivity : Activity() {
             setPadding(28, 40, 28, 24)
             setBackgroundColor(Color.rgb(244, 247, 251))
         }
-        val heading = TextView(this).apply { text = "PDF Forge"; textSize = 30f; setTextColor(Color.BLACK) }
-        layout.addView(heading)
-        layout.addView(TextView(this).apply { text = "Private • Offline • Lightweight"; textSize = 15f; setPadding(0, 8, 0, 26) })
-        listOf(
-            "Images to PDF" to "images",
-            "Merge PDFs" to "merge",
-            "Extract selected pages" to "extract",
-            "Split PDF (ZIP of pages)" to "split",
-            "Compress PDF (image-based)" to "compress"
-        ).forEach { (title, op) ->
-            layout.addView(Button(this).apply {
-                text = title
-                isAllCaps = false
-                setOnClickListener { operation = op; chooseFiles() }
-            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        fun card(title: String, subtitle: String, op: String): LinearLayout {
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(22, 18, 22, 18)
+                background = GradientDrawable().apply {
+                    setColor(Color.WHITE)
+                    cornerRadius = 22f
+                    setStroke(1, Color.rgb(221, 229, 239))
+                }
+                setOnClickListener {
+                    operation = op
+                    result = null
+                    saveButton.isEnabled = false
+                    previewButton.isEnabled = false
+                    chooseFiles()
+                }
+            }
+            card.addView(TextView(this).apply { text = title; textSize = 19f; setTextColor(Color.rgb(23, 60, 103)) })
+            card.addView(TextView(this).apply { text = subtitle; textSize = 13f; setTextColor(Color.DKGRAY })
+            return card
         }
+        layout.addView(TextView(this).apply { text = "PDFForge"; textSize = 34f; setTextColor(Color.rgb(23, 60, 103)); setPadding(0, 0, 0, 8) })
+        layout.addView(TextView(this).apply { text = "Your private PDF workspace • Offline"; textSize = 15f; setPadding(0, 0, 0, 22) })
+        listOf(
+            Triple("▣  Images to PDF", "Convert photos into a document", "images"),
+            Triple("⊕  Merge PDFs", "Combine and arrange PDF files", "merge"),
+            Triple("✂  Extract pages", "Save selected pages as a PDF", "extract"),
+            Triple("▤  Split PDF", "Export every page as a ZIP", "split"),
+            Triple("◫  Compress PDF", "Reduce image-based PDF size", "compress")
+        ).forEach { (title, subtitle, op) ->
+            layout.addView(card(title, subtitle, op), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12 })
+        }
+        layout.addView(TextView(this).apply { text = "Selected files"; textSize = 20f; setTextColor(Color.rgb(23, 60, 103)); setPadding(0, 12, 0, 8) })
+        filesPanel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        layout.addView(filesPanel)
+        runButton = Button(this).apply { text = "Process selected files"; isEnabled = false; setOnClickListener { processFiles() } }
+        layout.addView(runButton)
         pagesInput = EditText(this).apply {
             hint = "Pages to extract: e.g. 1,3-5 (blank = all)"
             inputType = android.text.InputType.TYPE_CLASS_TEXT
@@ -96,16 +121,68 @@ class MainActivity : Activity() {
             data.data?.let { if (!uris.contains(it)) uris.add(it) }
             selected = uris
             if (uris.isEmpty()) return
-            status.text = "Processing ${uris.size} file(s)…"
-            saveButton.isEnabled = false
-            previewButton.isEnabled = false
-            val pageSelection = pagesInput.text.toString()
-            val activeOperation = operation
-            thread {
+            showSelectedFiles()
+            runButton.isEnabled = true
+            status.text = "Review files and tap Process selected files."
+        } else if (requestCode == saveCode) {
+            val file = result ?: return
+            try {
+                contentResolver.openOutputStream(data.data!!)?.use { out -> file.inputStream().use { it.copyTo(out) } }
+                status.text = "PDF saved successfully."
+            } catch (e: Exception) { status.text = "Save failed: ${e.message}" }
+        }
+    }
+
+    private fun showSelectedFiles() {
+        filesPanel.removeAllViews()
+        selected.forEachIndexed { index, uri ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            val name = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                if (it.moveToFirst()) it.getString(0) else null
+            } ?: "Document ${index + 1}"
+            row.addView(TextView(this).apply {
+                text = "${index + 1}. $name"
+                textSize = 14f
+                setTextColor(Color.DKGRAY)
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            if (operation == "merge" || operation == "images") {
+                val up = Button(this).apply { text = "↑"; isEnabled = index > 0 }
+                up.setOnClickListener {
+                    val list = selected.toMutableList()
+                    val item = list.removeAt(index)
+                    list.add(index - 1, item)
+                    selected = list
+                    showSelectedFiles()
+                }
+                val down = Button(this).apply { text = "↓"; isEnabled = index < selected.lastIndex }
+                down.setOnClickListener {
+                    val list = selected.toMutableList()
+                    val item = list.removeAt(index)
+                    list.add(index + 1, item)
+                    selected = list
+                    showSelectedFiles()
+                }
+                row.addView(up)
+                row.addView(down)
+            }
+            filesPanel.addView(row)
+        }
+    }
+
+    private fun processFiles() {
+        val uris = selected.toList()
+        if (uris.isEmpty()) return
+        runButton.isEnabled = false
+        status.text = "Processing ${uris.size} file(s)…"
+        saveButton.isEnabled = false
+        previewButton.isEnabled = false
+        val pageSelection = pagesInput.text.toString()
+        val activeOperation = operation
+        thread {
                 try {
                     val zip = activeOperation == "split"
                     val file = File(cacheDir, "pdf_forge_${System.currentTimeMillis()}.${if (zip) "zip" else "pdf"}")
-                    when (operation) {
+                    when (activeOperation) {
                         "images" -> imagesToPdf(uris, file)
                         "merge" -> mergePdfs(uris, file)
                         "extract" -> extractPages(uris.first(), file, pageSelection)
@@ -114,18 +191,12 @@ class MainActivity : Activity() {
                     }
                     result = file
                     resultIsZip = zip
-                    runOnUiThread { status.text = "Ready: ${file.length() / 1024} KB. Preview or save."; saveButton.isEnabled = true; previewButton.isEnabled = !zip }
+                    runOnUiThread { status.text = "Ready: ${file.length() / 1024} KB. Preview or save."; saveButton.isEnabled = true; previewButton.isEnabled = !zip; runButton.isEnabled = true }
                 } catch (e: Exception) {
-                    runOnUiThread { status.text = "Failed: ${e.message}" }
+                    runOnUiThread { status.text = "Failed: ${e.message}"; runButton.isEnabled = true }
                 }
             }
-        } else if (requestCode == saveCode) {
-            val file = result ?: return
-            try {
-                contentResolver.openOutputStream(data.data!!)?.use { out -> file.inputStream().use { it.copyTo(out) } }
-                status.text = "PDF saved successfully."
-            } catch (e: Exception) { status.text = "Save failed: ${e.message}" }
-        }
+
     }
 
     private fun saveResult() {
