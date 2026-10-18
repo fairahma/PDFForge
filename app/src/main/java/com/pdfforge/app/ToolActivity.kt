@@ -398,58 +398,54 @@ class ToolActivity : Activity() {
     }
 
     private fun preview(file: File, allowSave: Boolean = true) {
-        val holder = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12, 12, 12, 12) }
-        val label = TextView(this).apply { gravity = Gravity.CENTER; textSize = 16f }
-        val image = ImageView(this).apply { adjustViewBounds = true; scaleType = ImageView.ScaleType.FIT_CENTER }
-        val controls = LinearLayout(this)
-        val previous = Button(this).apply { text = "Previous" }
-        val next = Button(this).apply { text = "Next" }
-        controls.addView(previous, LinearLayout.LayoutParams(0, -2, 1f))
-        controls.addView(next, LinearLayout.LayoutParams(0, -2, 1f))
-        holder.addView(label)
-        holder.addView(image, LinearLayout.LayoutParams(-1, 0, 1f))
-        holder.addView(controls)
-        val dialog = android.app.AlertDialog.Builder(this).setTitle("PDF Preview").setView(holder)
-            .setNegativeButton("Close", null).create()
+        val scroll = ScrollView(this)
+        val pages = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(12, 12, 12, 12)
+            setBackgroundColor(Color.rgb(225, 233, 246))
+        }
+        scroll.addView(pages)
+        val dialog = android.app.AlertDialog.Builder(this)
+            .setTitle("Scroll PDF preview")
+            .setView(scroll)
+            .setNegativeButton("Close", null)
+            .create()
         dialog.show()
-        dialog.window?.setLayout(-1, (resources.displayMetrics.heightPixels * 0.8).toInt())
-        var current = 0
-        var token = 0
-        fun showPage() {
-            val request = ++token
-            val pageIndex = current
-            label.text = "Loading page ${pageIndex + 1}..."
-            previous.isEnabled = false
-            next.isEnabled = false
-            thread {
-                try {
-                    ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
-                        PdfRenderer(fd).use { renderer ->
-                            val count = renderer.pageCount
-                            renderer.openPage(pageIndex).use { page ->
-                                val scale = minOf(1.5f, 1000f / page.width)
-                                val bitmap = Bitmap.createBitmap((page.width * scale).toInt().coerceAtLeast(1), (page.height * scale).toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
-                                bitmap.eraseColor(Color.WHITE)
-                                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                                runOnUiThread {
-                                    if (dialog.isShowing && request == token) {
-                                        image.setImageBitmap(bitmap)
-                                        label.text = "Page ${pageIndex + 1} of $count"
-                                        previous.isEnabled = pageIndex > 0
-                                        next.isEnabled = pageIndex < count - 1
-                                    } else bitmap.recycle()
+        dialog.window?.setLayout(-1, (resources.displayMetrics.heightPixels * 0.84).toInt())
+        thread {
+            try {
+                ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+                    PdfRenderer(fd).use { renderer ->
+                        for (index in 0 until renderer.pageCount) {
+                            if (!dialog.isShowing) break
+                            val bitmap = renderer.openPage(index).use { page ->
+                                val width = 540
+                                val height = (width.toFloat() * page.height / page.width).toInt().coerceAtLeast(1)
+                                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also {
+                                    it.eraseColor(Color.WHITE)
+                                    page.render(it, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                                 }
+                            }
+                            runOnUiThread {
+                                if (dialog.isShowing) {
+                                    pages.addView(TextView(this).apply {
+                                        text = "Page ${index + 1}"
+                                        setTextColor(Color.DKGRAY)
+                                        setPadding(0, 14, 0, 6)
+                                    })
+                                    pages.addView(ImageView(this).apply {
+                                        setImageBitmap(bitmap)
+                                        adjustViewBounds = true
+                                    })
+                                } else bitmap.recycle()
                             }
                         }
                     }
-                } catch (e: Exception) {
-                    runOnUiThread { if (dialog.isShowing && request == token) label.text = "Preview failed: ${e.message}" }
                 }
+            } catch (e: Exception) {
+                runOnUiThread { if (dialog.isShowing) status.text = "Preview failed: ${e.message}" }
             }
         }
-        previous.setOnClickListener { if (current > 0) { current--; showPage() } }
-        next.setOnClickListener { current++; showPage() }
-        showPage()
     }
 
     private fun imagesToPdf(uris: List<Uri>, file: File) {
