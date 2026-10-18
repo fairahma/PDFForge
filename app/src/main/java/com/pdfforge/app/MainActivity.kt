@@ -59,6 +59,10 @@ class MainActivity : Activity() {
                     setStroke(1, Color.rgb(221, 229, 239))
                 }
                 setOnClickListener {
+                    if (op == "merge" || op == "extract" || op == "organize") {
+                        startActivity(Intent(this@MainActivity, PageEditorActivity::class.java).putExtra("tool", op))
+                        return@setOnClickListener
+                    }
                     operation = op
                     result = null
                     saveButton.isEnabled = false
@@ -76,7 +80,8 @@ class MainActivity : Activity() {
         layout.addView(TextView(this).apply { text = "Your private PDF workspace • Offline"; textSize = 15f; setPadding(0, 0, 0, 22) })
         listOf(
             Triple("▣  Images to PDF", "Convert photos into a document", "images"),
-            Triple("⊕  Merge PDFs", "Combine and arrange PDF files", "merge"),
+            Triple("⊕  Merge PDFs", "Open a visual drag-and-drop page editor", "merge"),
+            Triple("▦  Organize PDF", "Reorder and remove pages visually", "organize"),
             Triple("✂  Extract pages", "Save selected pages as a PDF", "extract"),
             Triple("▤  Split PDF", "Export every page as a ZIP", "split"),
             Triple("◫  Compress PDF", "Reduce image-based PDF size", "compress")
