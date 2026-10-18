@@ -31,8 +31,8 @@ class PageEditorActivity : Activity() {
     private var mode = "organize"
     private val pickRequest = 201
     private val saveRequest = 202
-    private val navy = Color.rgb(22, 49, 88)
-    private val blue = Color.rgb(45, 102, 205)
+    private val navy = Color.rgb(235, 242, 255)
+    private val blue = Color.rgb(242, 90, 96)
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun rounded(color: Int, radius: Int = 16) = GradientDrawable().apply {
         setColor(color); cornerRadius = dp(radius).toFloat()
@@ -46,7 +46,7 @@ class PageEditorActivity : Activity() {
         title = "PDFForge"
         val outer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(245, 248, 253))
+            setBackgroundColor(Color.rgb(16, 29, 53))
             setPadding(dp(16), dp(18), dp(16), dp(10))
         }
         val header = label("‹  " + when(mode) {
@@ -56,7 +56,8 @@ class PageEditorActivity : Activity() {
         }, 26f)
         header.setOnClickListener { finish() }
         outer.addView(header)
-        outer.addView(label("Hold and drag a page to reorder. Tap a page to view or remove it.", 13f, Color.DKGRAY))
+        outer.addView(label("PDFForge Studio  •  Visual page editor", 13f, Color.rgb(242, 90, 96)))
+        outer.addView(label("Hold and drag a page to reorder. Tap a page to view or remove it.", 13f, Color.rgb(182, 200, 229)))
         val toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         val add = Button(this).apply {
             text = "+ Add PDF"
@@ -70,6 +71,10 @@ class PageEditorActivity : Activity() {
             setOnClickListener { buildResult(true) }
         }
         toolbar.addView(preview, LinearLayout.LayoutParams(0, -2, 1f))
+        add.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(65, 92, 137))
+        add.setTextColor(Color.WHITE)
+        preview.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(65, 92, 137))
+        preview.setTextColor(Color.WHITE)
         outer.addView(toolbar)
         info = label("Choose a PDF to start editing.", 14f)
         info.setPadding(0, dp(12), 0, dp(12))
@@ -156,12 +161,12 @@ class PageEditorActivity : Activity() {
             val tile = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(8), dp(8), dp(8), dp(8))
-                background = rounded(Color.WHITE)
+                background = rounded(Color.rgb(35, 53, 82))
                 elevation = dp(2).toFloat()
             }
             val image = ImageView(this).apply {
                 scaleType = ImageView.ScaleType.FIT_CENTER
-                setBackgroundColor(Color.rgb(234, 239, 247))
+                setBackgroundColor(Color.rgb(225, 233, 246))
             }
             tile.addView(image, LinearLayout.LayoutParams(-1, dp(165)))
             tile.addView(label("Page ${index + 1}", 14f))
