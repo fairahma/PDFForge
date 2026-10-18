@@ -262,7 +262,7 @@ class MainActivity : Activity() {
                 val file = temporary
                 runOnUiThread {
                     status.text = "Previewing selected PDF"
-                    preview(file)
+                    preview(file, false)
                 }
             } catch (e: Exception) {
                 runOnUiThread { status.text = "Cannot preview: ${e.message}" }
@@ -396,7 +396,7 @@ class MainActivity : Activity() {
         } finally { source.delete() }
     }
 
-    private fun preview(file: File) {
+    private fun preview(file: File, allowSave: Boolean = true) {
         val holder = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12, 12, 12, 12) }
         val label = TextView(this).apply { gravity = Gravity.CENTER; textSize = 16f }
         val image = ImageView(this).apply { adjustViewBounds = true; scaleType = ImageView.ScaleType.FIT_CENTER }
@@ -409,7 +409,7 @@ class MainActivity : Activity() {
         holder.addView(image, LinearLayout.LayoutParams(-1, 0, 1f))
         holder.addView(controls)
         val dialog = android.app.AlertDialog.Builder(this).setTitle("PDF Preview").setView(holder)
-            .setPositiveButton("Save") { _, _ -> saveResult() }.setNegativeButton("Close", null).create()
+            .setNegativeButton("Close", null).create()
         dialog.show()
         dialog.window?.setLayout(-1, (resources.displayMetrics.heightPixels * 0.8).toInt())
         var current = 0
