@@ -48,14 +48,14 @@ class ToolActivity : Activity() {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(28, 40, 28, 24)
-            setBackgroundColor(Color.rgb(244, 247, 251))
+            setBackgroundColor(Color.rgb(16, 29, 53))
         }
         fun card(title: String, subtitle: String, op: String): LinearLayout {
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(28, 24, 28, 24)
                 background = GradientDrawable().apply {
-                    setColor(Color.WHITE)
+                    setColor(Color.rgb(35, 53, 82))
                     cornerRadius = 28f
                     setStroke(1, Color.rgb(221, 229, 239))
                 }
@@ -73,8 +73,8 @@ class ToolActivity : Activity() {
                     chooseFiles()
                 }
             }
-            card.addView(TextView(this).apply { text = title; textSize = 19f; setTextColor(Color.rgb(23, 60, 103)) })
-            card.addView(TextView(this).apply { text = subtitle; textSize = 13f; setTextColor(Color.DKGRAY) })
+            card.addView(TextView(this).apply { text = title; textSize = 19f; setTextColor(Color.rgb(235, 242, 255)) })
+            card.addView(TextView(this).apply { text = subtitle; textSize = 13f; setTextColor(Color.rgb(205, 219, 239)) })
             return card
         }
         layout.addView(TextView(this).apply { text = "PDFForge"; textSize = 34f; setTextColor(Color.rgb(23, 60, 103)); setPadding(0, 0, 0, 8) })
@@ -104,7 +104,9 @@ class ToolActivity : Activity() {
             setOnClickListener { if (operation.isNotEmpty()) chooseFiles() else status.text = "Choose a tool above first." }
         })
         layout.addView(workspace, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 14; bottomMargin = 12 })
-        runButton = Button(this).apply { text = "Process selected files"; isEnabled = false; setOnClickListener { processFiles() } }
+        runButton = Button(this).apply { text = "Create PDF"; isEnabled = false; setOnClickListener { processFiles() } }
+        runButton.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(242, 90, 96))
+        runButton.setTextColor(Color.WHITE)
         layout.addView(runButton)
         pagesInput = EditText(this).apply {
             hint = "Pages to extract: e.g. 1,3-5 (blank = all)"
@@ -165,7 +167,7 @@ class ToolActivity : Activity() {
             filesPanel.addView(TextView(this).apply {
                 text = "No files selected yet. Choose a tool above to add your documents."
                 textSize = 15f
-                setTextColor(Color.GRAY)
+                setTextColor(Color.rgb(182, 200, 229))
                 setPadding(0, 12, 0, 20)
             })
             if (::runButton.isInitialized) runButton.isEnabled = false
