@@ -289,8 +289,7 @@ class ToolActivity : Activity() {
         thread {
             val source = copySource(uri)
             try {
-                val folderDoc = androidx.documentfile.provider.DocumentFile.fromTreeUri(this, folder)
-                    ?: error("Cannot access chosen folder")
+                val parent = android.provider.DocumentsContract.buildDocumentUriUsingTree(folder, android.provider.DocumentsContract.getTreeDocumentId(folder))
                 PDDocument.load(source).use { original ->
                     val total = original.numberOfPages
                     require(total > 1) { "PDF must have at least two pages" }
@@ -305,11 +304,11 @@ class ToolActivity : Activity() {
                     var start = 0
                     ends.forEachIndexed { partIndex, end ->
                         val name = "PDFForge_part_${partIndex + 1}_pages_${start + 1}-$end.pdf"
-                        val dest = folderDoc.createFile("application/pdf", name)
+                        val dest = android.provider.DocumentsContract.createDocument(contentResolver, parent, "application/pdf", name)
                             ?: error("Cannot create $name")
                         PDDocument().use { part ->
                             for (i in start until end) part.importPage(original.getPage(i))
-                            contentResolver.openOutputStream(dest.uri)?.use { part.save(it) }
+                            contentResolver.openOutputStream(dest)?.use { part.save(it) }
                                 ?: error("Cannot write $name")
                         }
                         start = end
