@@ -5,7 +5,7 @@ plugins {
 android {
     namespace = "com.pdfforge.app"
     compileSdk = 35
-    defaultConfig { applicationId = "com.pdfforge.app"; minSdk = 29; targetSdk = 35; versionCode = 6; versionName = "0.6.0" }
+    defaultConfig { applicationId = "com.pdfforge.app"; minSdk = 29; targetSdk = 35; versionCode = 7; versionName = "0.7.0" }
     signingConfigs {
         create("stableRelease") {
             storeFile = file(System.getenv("PDF_FORGE_KEYSTORE_PATH") ?: "signing-placeholder.jks")
