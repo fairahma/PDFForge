@@ -20,6 +20,8 @@ import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.multipdf.PDFMergerUtility
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import kotlin.concurrent.thread
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 class MainActivity : Activity() {
     private val pickCode = 10
@@ -29,6 +31,9 @@ class MainActivity : Activity() {
     private var result: File? = null
     private lateinit var status: TextView
     private lateinit var saveButton: Button
+    private lateinit var previewButton: Button
+    private lateinit var pagesInput: EditText
+    private var resultIsZip = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,7 +41,7 @@ class MainActivity : Activity() {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(28, 40, 28, 24)
-            setBackgroundColor(Color.rgb(250, 250, 250))
+            setBackgroundColor(Color.rgb(244, 247, 251))
         }
         val heading = TextView(this).apply { text = "PDF Forge"; textSize = 30f; setTextColor(Color.BLACK) }
         layout.addView(heading)
@@ -44,7 +49,8 @@ class MainActivity : Activity() {
         listOf(
             "Images to PDF" to "images",
             "Merge PDFs" to "merge",
-            "Extract first PDF page" to "split",
+            "Extract selected pages" to "extract",
+            "Split PDF (ZIP of pages)" to "split",
             "Compress PDF (image-based)" to "compress"
         ).forEach { (title, op) ->
             layout.addView(Button(this).apply {
@@ -53,10 +59,19 @@ class MainActivity : Activity() {
                 setOnClickListener { operation = op; chooseFiles() }
             }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
+        pagesInput = EditText(this).apply {
+            hint = "Pages to extract: e.g. 1,3-5 (blank = all)"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+            setSingleLine(true)
+        }
+        layout.addView(pagesInput)
+        layout.addView(TextView(this).apply { text = "Extract: enter page numbers above. Split: creates a ZIP of individual PDF pages."; textSize = 13f })
         status = TextView(this).apply { text = "Choose a tool to begin."; textSize = 15f; setPadding(0, 30, 0, 16) }
         layout.addView(status)
         saveButton = Button(this).apply { text = "Save result"; isEnabled = false; setOnClickListener { saveResult() } }
         layout.addView(saveButton)
+        previewButton = Button(this).apply { text = "Preview PDF result"; isEnabled = false; setOnClickListener { result?.let { preview(it) } } }
+        layout.addView(previewButton)
         val scroll = ScrollView(this)
         scroll.addView(layout)
         setContentView(scroll)
@@ -83,17 +98,23 @@ class MainActivity : Activity() {
             if (uris.isEmpty()) return
             status.text = "Processing ${uris.size} file(s)…"
             saveButton.isEnabled = false
+            previewButton.isEnabled = false
+            val pageSelection = pagesInput.text.toString()
+            val activeOperation = operation
             thread {
                 try {
-                    val file = File(cacheDir, "pdf_forge_${System.currentTimeMillis()}.pdf")
+                    val zip = activeOperation == "split"
+                    val file = File(cacheDir, "pdf_forge_${System.currentTimeMillis()}.${if (zip) "zip" else "pdf"}")
                     when (operation) {
                         "images" -> imagesToPdf(uris, file)
                         "merge" -> mergePdfs(uris, file)
-                        "split" -> extractFirstPage(uris, file)
+                        "extract" -> extractPages(uris.first(), file, pageSelection)
+                        "split" -> splitPages(uris.first(), file)
                         "compress" -> renderToPdf(uris, file, 55, false)
                     }
                     result = file
-                    runOnUiThread { status.text = "Ready: ${file.length() / 1024} KB. Tap Save result."; saveButton.isEnabled = true }
+                    resultIsZip = zip
+                    runOnUiThread { status.text = "Ready: ${file.length() / 1024} KB. Preview or save."; saveButton.isEnabled = true; previewButton.isEnabled = !zip }
                 } catch (e: Exception) {
                     runOnUiThread { status.text = "Failed: ${e.message}" }
                 }
@@ -110,8 +131,8 @@ class MainActivity : Activity() {
     private fun saveResult() {
         startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
-            type = "application/pdf"
-            putExtra(Intent.EXTRA_TITLE, "PDFForge_${System.currentTimeMillis()}.pdf")
+            type = if (resultIsZip) "application/zip" else "application/pdf"
+            putExtra(Intent.EXTRA_TITLE, "PDFForge_${System.currentTimeMillis()}.${if (resultIsZip) "zip" else "pdf"}")
         }, saveCode)
     }
 
@@ -135,22 +156,127 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun extractFirstPage(uris: List<Uri>, output: File) {
-        val source = File.createTempFile("split_", ".pdf", cacheDir)
+    private fun copySource(uri: Uri): File {
+        val source = File.createTempFile("input_", ".pdf", cacheDir)
         try {
-            contentResolver.openInputStream(uris.first())?.use { input ->
+            contentResolver.openInputStream(uri)?.use { input ->
                 source.outputStream().use { input.copyTo(it) }
-            } ?: error("Unable to read PDF")
+            } ?: error("Cannot open selected PDF")
+            return source
+        } catch (e: Exception) { source.delete(); throw e }
+    }
+
+    private fun parsePages(text: String, total: Int): List<Int> {
+        if (text.isBlank()) return (0 until total).toList()
+        val pages = linkedSetOf<Int>()
+        text.split(",").forEach { token ->
+            val part = token.trim()
+            val match = Regex("^(\\d+)\\s*-\\s*(\\d+)$").matchEntire(part)
+            val range = if (match != null) {
+                val a = match.groupValues[1].toInt()
+                val b = match.groupValues[2].toInt()
+                require(a <= b) { "Invalid range: $part" }
+                a..b
+            } else {
+                val page = part.toIntOrNull() ?: error("Invalid page: $part")
+                page..page
+            }
+            require(range.first >= 1 && range.last <= total) { "Page outside 1-$total: $part" }
+            pages.addAll(range.map { it - 1 })
+        }
+        return pages.toList()
+    }
+
+    private fun extractPages(uri: Uri, output: File, selection: String) {
+        val source = copySource(uri)
+        try {
             PDDocument.load(source).use { original ->
-                require(original.numberOfPages > 0) { "PDF has no pages" }
+                val pages = parsePages(selection, original.numberOfPages)
+                require(pages.isNotEmpty()) { "Select at least one page" }
                 PDDocument().use { extracted ->
-                    extracted.importPage(original.getPage(0))
+                    pages.forEach { extracted.importPage(original.getPage(it)) }
                     extracted.save(output)
                 }
             }
-        } finally {
-            source.delete()
+        } finally { source.delete() }
+    }
+
+    private fun splitPages(uri: Uri, output: File) {
+        val source = copySource(uri)
+        try {
+            PDDocument.load(source).use { original ->
+                require(original.numberOfPages > 0) { "PDF has no pages" }
+                ZipOutputStream(output.outputStream().buffered()).use { zip ->
+                    for (index in 0 until original.numberOfPages) {
+                        val part = File.createTempFile("page_", ".pdf", cacheDir)
+                        try {
+                            PDDocument().use { single ->
+                                single.importPage(original.getPage(index))
+                                single.save(part)
+                            }
+                            zip.putNextEntry(ZipEntry("page_%03d.pdf".format(index + 1)))
+                            part.inputStream().use { it.copyTo(zip) }
+                            zip.closeEntry()
+                        } finally { part.delete() }
+                    }
+                }
+            }
+        } finally { source.delete() }
+    }
+
+    private fun preview(file: File) {
+        val holder = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12, 12, 12, 12) }
+        val label = TextView(this).apply { gravity = Gravity.CENTER; textSize = 16f }
+        val image = ImageView(this).apply { adjustViewBounds = true; scaleType = ImageView.ScaleType.FIT_CENTER }
+        val controls = LinearLayout(this)
+        val previous = Button(this).apply { text = "Previous" }
+        val next = Button(this).apply { text = "Next" }
+        controls.addView(previous, LinearLayout.LayoutParams(0, -2, 1f))
+        controls.addView(next, LinearLayout.LayoutParams(0, -2, 1f))
+        holder.addView(label)
+        holder.addView(image, LinearLayout.LayoutParams(-1, 0, 1f))
+        holder.addView(controls)
+        val dialog = android.app.AlertDialog.Builder(this).setTitle("PDF Preview").setView(holder)
+            .setPositiveButton("Save") { _, _ -> saveResult() }.setNegativeButton("Close", null).create()
+        dialog.show()
+        dialog.window?.setLayout(-1, (resources.displayMetrics.heightPixels * 0.8).toInt())
+        var current = 0
+        var token = 0
+        fun showPage() {
+            val request = ++token
+            val pageIndex = current
+            label.text = "Loading page ${pageIndex + 1}..."
+            previous.isEnabled = false
+            next.isEnabled = false
+            thread {
+                try {
+                    ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+                        PdfRenderer(fd).use { renderer ->
+                            val count = renderer.pageCount
+                            renderer.openPage(pageIndex).use { page ->
+                                val scale = minOf(1.5f, 1000f / page.width)
+                                val bitmap = Bitmap.createBitmap((page.width * scale).toInt().coerceAtLeast(1), (page.height * scale).toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+                                bitmap.eraseColor(Color.WHITE)
+                                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                runOnUiThread {
+                                    if (dialog.isShowing && request == token) {
+                                        image.setImageBitmap(bitmap)
+                                        label.text = "Page ${pageIndex + 1} of $count"
+                                        previous.isEnabled = pageIndex > 0
+                                        next.isEnabled = pageIndex < count - 1
+                                    } else bitmap.recycle()
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread { if (dialog.isShowing && request == token) label.text = "Preview failed: ${e.message}" }
+                }
+            }
         }
+        previous.setOnClickListener { if (current > 0) { current--; showPage() } }
+        next.setOnClickListener { current++; showPage() }
+        showPage()
     }
 
     private fun imagesToPdf(uris: List<Uri>, file: File) {
