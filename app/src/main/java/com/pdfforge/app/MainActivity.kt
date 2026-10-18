@@ -38,6 +38,8 @@ class MainActivity : Activity() {
     private var resultIsZip = false
     private lateinit var filesPanel: LinearLayout
     private lateinit var runButton: Button
+    private lateinit var selectionTitle: TextView
+    private lateinit var workspace: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,10 +52,10 @@ class MainActivity : Activity() {
         fun card(title: String, subtitle: String, op: String): LinearLayout {
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(22, 18, 22, 18)
+                setPadding(28, 24, 28, 24)
                 background = GradientDrawable().apply {
                     setColor(Color.WHITE)
-                    cornerRadius = 22f
+                    cornerRadius = 28f
                     setStroke(1, Color.rgb(221, 229, 239))
                 }
                 setOnClickListener {
@@ -61,6 +63,8 @@ class MainActivity : Activity() {
                     result = null
                     saveButton.isEnabled = false
                     previewButton.isEnabled = false
+                    selected = emptyList()
+                    showSelectedFiles()
                     chooseFiles()
                 }
             }
@@ -79,9 +83,30 @@ class MainActivity : Activity() {
         ).forEach { (title, subtitle, op) ->
             layout.addView(card(title, subtitle, op), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12 })
         }
-        layout.addView(TextView(this).apply { text = "Selected files"; textSize = 20f; setTextColor(Color.rgb(23, 60, 103)); setPadding(0, 12, 0, 8) })
+        workspace = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 20, 20, 20)
+            background = GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = 28f
+                setStroke(2, Color.rgb(218, 228, 242))
+            }
+        }
+        selectionTitle = TextView(this).apply {
+            text = "YOUR WORKSPACE"
+            textSize = 18f
+            setTextColor(Color.rgb(23, 60, 103))
+            setPadding(0, 0, 0, 12)
+        }
+        workspace.addView(selectionTitle)
         filesPanel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        layout.addView(filesPanel)
+        workspace.addView(filesPanel)
+        workspace.addView(Button(this).apply {
+            text = "+ Add / change files"
+            isAllCaps = false
+            setOnClickListener { if (operation.isNotEmpty()) chooseFiles() else status.text = "Choose a tool above first." }
+        })
+        layout.addView(workspace, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 14; bottomMargin = 12 })
         runButton = Button(this).apply { text = "Process selected files"; isEnabled = false; setOnClickListener { processFiles() } }
         layout.addView(runButton)
         pagesInput = EditText(this).apply {
@@ -100,6 +125,7 @@ class MainActivity : Activity() {
         val scroll = ScrollView(this)
         scroll.addView(layout)
         setContentView(scroll)
+        showSelectedFiles()
     }
 
     private fun chooseFiles() {
@@ -135,37 +161,112 @@ class MainActivity : Activity() {
 
     private fun showSelectedFiles() {
         filesPanel.removeAllViews()
+        selectionTitle.text = "SELECTED FILES  •  ${selected.size}"
+        if (selected.isEmpty()) {
+            filesPanel.addView(TextView(this).apply {
+                text = "No files selected yet. Choose a tool above to add your documents."
+                textSize = 15f
+                setTextColor(Color.GRAY)
+                setPadding(0, 12, 0, 20)
+            })
+            if (::runButton.isInitialized) runButton.isEnabled = false
+            return
+        }
         selected.forEachIndexed { index, uri ->
-            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-            val name = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
-                if (it.moveToFirst()) it.getString(0) else null
-            } ?: "Document ${index + 1}"
-            row.addView(TextView(this).apply {
-                text = "${index + 1}. $name"
-                textSize = 14f
-                setTextColor(Color.DKGRAY)
-            }, LinearLayout.LayoutParams(0, -2, 1f))
-            if (operation == "merge" || operation == "images") {
-                val up = Button(this).apply { text = "↑"; isEnabled = index > 0 }
-                up.setOnClickListener {
-                    val list = selected.toMutableList()
-                    val item = list.removeAt(index)
-                    list.add(index - 1, item)
-                    selected = list
-                    showSelectedFiles()
+            val metadata = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use {
+                if (it.moveToFirst()) {
+                    val name = it.getString(0) ?: "Document ${index + 1}"
+                    val bytes = if (it.isNull(1)) 0L else it.getLong(1)
+                    Pair(name, bytes)
+                } else Pair("Document ${index + 1}", 0L)
+            } ?: Pair("Document ${index + 1}", 0L)
+            val tile = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(14, 14, 14, 14)
+                background = GradientDrawable().apply {
+                    setColor(Color.rgb(245, 248, 253))
+                    cornerRadius = 18f
                 }
-                val down = Button(this).apply { text = "↓"; isEnabled = index < selected.lastIndex }
-                down.setOnClickListener {
-                    val list = selected.toMutableList()
-                    val item = list.removeAt(index)
-                    list.add(index + 1, item)
-                    selected = list
-                    showSelectedFiles()
-                }
-                row.addView(up)
-                row.addView(down)
             }
-            filesPanel.addView(row)
+            val heading = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            heading.addView(TextView(this).apply {
+                text = if (operation == "images") "▧" else "▣"
+                textSize = 29f
+                setTextColor(Color.rgb(219, 63, 77))
+            })
+            val detail = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12, 0, 0, 0) }
+            detail.addView(TextView(this).apply {
+                text = metadata.first
+                textSize = 15f
+                setTextColor(Color.rgb(30, 43, 63))
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+            detail.addView(TextView(this).apply {
+                text = if (metadata.second > 0) "${metadata.second / 1024} KB • Item ${index + 1}" else "Item ${index + 1}"
+                textSize = 12f
+                setTextColor(Color.GRAY)
+            })
+            heading.addView(detail, LinearLayout.LayoutParams(0, -2, 1f))
+            tile.addView(heading)
+            val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            if (operation != "images") {
+                actions.addView(Button(this).apply {
+                    text = "View"
+                    isAllCaps = false
+                    setOnClickListener { previewSelected(uri) }
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+            }
+            if (operation == "merge" || operation == "images") {
+                actions.addView(Button(this).apply {
+                    text = "↑"
+                    isEnabled = index > 0
+                    setOnClickListener {
+                        val list = selected.toMutableList()
+                        list.add(index - 1, list.removeAt(index))
+                        selected = list
+                        showSelectedFiles()
+                    }
+                })
+                actions.addView(Button(this).apply {
+                    text = "↓"
+                    isEnabled = index < selected.lastIndex
+                    setOnClickListener {
+                        val list = selected.toMutableList()
+                        list.add(index + 1, list.removeAt(index))
+                        selected = list
+                        showSelectedFiles()
+                    }
+                })
+            }
+            actions.addView(Button(this).apply {
+                text = "Remove"
+                isAllCaps = false
+                setOnClickListener {
+                    selected = selected.filterIndexed { i, _ -> i != index }
+                    showSelectedFiles()
+                }
+            })
+            tile.addView(actions)
+            filesPanel.addView(tile, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = 12 })
+        }
+        if (::runButton.isInitialized) runButton.isEnabled = true
+    }
+
+    private fun previewSelected(uri: Uri) {
+        status.text = "Preparing selected PDF preview..."
+        thread {
+            var temporary: File? = null
+            try {
+                temporary = copySource(uri)
+                val file = temporary
+                runOnUiThread {
+                    status.text = "Previewing selected PDF"
+                    preview(file)
+                }
+            } catch (e: Exception) {
+                runOnUiThread { status.text = "Cannot preview: ${e.message}" }
+            }
         }
     }
 
