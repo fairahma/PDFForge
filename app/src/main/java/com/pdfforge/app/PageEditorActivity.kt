@@ -27,6 +27,7 @@ class PageEditorActivity : Activity() {
     private lateinit var grid: GridLayout
     private lateinit var info: TextView
     private lateinit var save: Button
+    private var extractInput: EditText? = null
     private var output: File? = null
     private var mode = "organize"
     private val pickRequest = 201
@@ -76,6 +77,18 @@ class PageEditorActivity : Activity() {
         preview.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(65, 92, 137))
         preview.setTextColor(Color.WHITE)
         outer.addView(toolbar)
+        if (mode == "extract") {
+            outer.addView(label("Pages to extract (e.g. 1,3,5-8)", 14f))
+            extractInput = EditText(this).apply {
+                hint = "1,3,5-8  •  Blank = all pages"
+                setSingleLine(true)
+                setTextColor(Color.WHITE)
+                setHintTextColor(Color.rgb(168, 184, 208))
+                backgroundTintList = android.content.res.ColorStateList.valueOf(blue)
+                inputType = android.text.InputType.TYPE_CLASS_TEXT
+            }
+            outer.addView(extractInput)
+        }
         info = label("Choose a PDF to start editing.", 14f)
         info.setPadding(0, dp(12), 0, dp(12))
         outer.addView(info)
@@ -221,25 +234,94 @@ class PageEditorActivity : Activity() {
         }
     }
     private fun showSourcePage(ref: PageRef) {
+        showScrollablePdf(sources[ref.source], "Selected PDF", null)
+    }
+
+    private fun showScrollablePdf(file: File, title: String, onSave: (() -> Unit)?) {
+        val scroll = ScrollView(this)
+        val stack = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            setBackgroundColor(Color.rgb(225, 233, 246))
+        }
+        scroll.addView(stack)
+        val builder = AlertDialog.Builder(this).setTitle(title).setView(scroll)
+            .setNegativeButton("Close", null)
+        if (onSave != null) builder.setPositiveButton("Save PDF") { _, _ -> onSave() }
+        val dialog = builder.create()
+        dialog.show()
+        dialog.window?.setLayout(-1, (resources.displayMetrics.heightPixels * 0.84f).toInt())
         thread {
             try {
-                val bitmap = renderPage(sources[ref.source], ref.page, 900)
-                runOnUiThread {
-                    val view = ImageView(this).apply {
-                        setImageBitmap(bitmap)
-                        adjustViewBounds = true
+                ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+                    PdfRenderer(fd).use { renderer ->
+                        val count = renderer.pageCount
+                        for (index in 0 until count) {
+                            if (!dialog.isShowing) break
+                            val bitmap = renderer.openPage(index).use { page ->
+                                val width = 540
+                                val height = (width.toFloat() * page.height / page.width).toInt().coerceAtLeast(1)
+                                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also {
+                                    it.eraseColor(Color.WHITE)
+                                    page.render(it, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                }
+                            }
+                            runOnUiThread {
+                                if (dialog.isShowing) {
+                                    val number = label("Page ${index + 1} of $count", 13f, Color.rgb(21, 43, 80)).apply {
+                                        setPadding(dp(4), dp(12), 0, dp(5))
+                                    }
+                                    val image = ImageView(this).apply {
+                                        setImageBitmap(bitmap)
+                                        adjustViewBounds = true
+                                        scaleType = ImageView.ScaleType.FIT_CENTER
+                                    }
+                                    stack.addView(number)
+                                    stack.addView(image, LinearLayout.LayoutParams(-1, -2))
+                                } else bitmap.recycle()
+                            }
+                        }
                     }
-                    AlertDialog.Builder(this).setTitle("Original page ${ref.page + 1}")
-                        .setView(view).setPositiveButton("Close", null).show()
                 }
-            } catch (e: Exception) { runOnUiThread { info.text = "Preview failed: ${e.message}" } }
+            } catch (e: Exception) {
+                runOnUiThread { if (dialog.isShowing) stack.addView(label("Preview failed: ${e.message}", 14f, Color.RED)) }
+            }
         }
     }
+
+    private fun requestedPages(): List<PageRef> {
+        val raw = extractInput?.text?.toString()?.trim().orEmpty()
+        if (mode != "extract" || raw.isBlank()) return pages.toList()
+        val chosen = linkedSetOf<Int>()
+        for (piece in raw.split(",")) {
+            val token = piece.trim()
+            val range = Regex("^(\\d+)\\s*-\\s*(\\d+)$").matchEntire(token)
+            val first: Int
+            val last: Int
+            if (range != null) {
+                first = range.groupValues[1].toInt()
+                last = range.groupValues[2].toInt()
+            } else {
+                first = token.toIntOrNull() ?: error("Invalid page number: $token")
+                last = first
+            }
+            require(first >= 1 && last >= first && last <= pages.size) {
+                "Page range must be within 1-${pages.size}"
+            }
+            for (n in first..last) chosen.add(n - 1)
+        }
+        return chosen.map { pages[it] }
+    }
+
     private fun buildResult(showPreview: Boolean) {
         if (pages.isEmpty()) return
         save.isEnabled = false
         info.text = "Preparing PDF preview..."
-        val snapshot = pages.toList()
+        val snapshot = try { requestedPages() } catch (e: Exception) {
+            info.text = e.message ?: "Invalid page selection"
+            save.isEnabled = true
+            return
+        }
         thread {
             try {
                 val file = File(cacheDir, "edited_${System.currentTimeMillis()}.pdf")
@@ -262,45 +344,7 @@ class PageEditorActivity : Activity() {
         }
     }
     private fun showResult(file: File) {
-        val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val pageImage = ImageView(this).apply { adjustViewBounds = true }
-        val counter = label("", 15f)
-        counter.gravity = Gravity.CENTER
-        body.addView(counter)
-        body.addView(pageImage, LinearLayout.LayoutParams(-1, dp(460)))
-        val controls = LinearLayout(this)
-        val previous = Button(this).apply { text = "Previous" }
-        val next = Button(this).apply { text = "Next" }
-        controls.addView(previous, LinearLayout.LayoutParams(0, -2, 1f))
-        controls.addView(next, LinearLayout.LayoutParams(0, -2, 1f))
-        body.addView(controls)
-        val dialog = AlertDialog.Builder(this).setTitle("Final PDF preview")
-            .setView(body).setNegativeButton("Back to edit", null)
-            .setPositiveButton("Save PDF") { _, _ -> saveOutput() }.create()
-        dialog.show()
-        var page = 0
-        var generation = 0
-        fun update() {
-            val current = page
-            val request = ++generation
-            counter.text = "Loading..."
-            thread {
-                try {
-                    val bitmap = renderPage(file, current, 700)
-                    runOnUiThread {
-                        if (dialog.isShowing && request == generation) {
-                            pageImage.setImageBitmap(bitmap)
-                            counter.text = "Page ${current + 1} of ${pages.size}"
-                            previous.isEnabled = current > 0
-                            next.isEnabled = current < pages.lastIndex
-                        } else bitmap.recycle()
-                    }
-                } catch (e: Exception) { runOnUiThread { counter.text = "Preview failed: ${e.message}" } }
-            }
-        }
-        previous.setOnClickListener { if (page > 0) { page--; update() } }
-        next.setOnClickListener { if (page < pages.lastIndex) { page++; update() } }
-        update()
+        showScrollablePdf(file, "Final PDF preview", { saveOutput() })
     }
     private fun saveOutput() {
         startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
