@@ -17,12 +17,12 @@ class MainActivity : Activity() {
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val navy = Color.rgb(21, 43, 80)
-        val blue = Color.rgb(42, 98, 215)
+        val navy = Color.WHITE
+        val blue = Color.rgb(242, 90, 96)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(34), dp(20), dp(20))
-            setBackgroundColor(Color.rgb(245, 248, 253))
+            setBackgroundColor(Color.rgb(16, 29, 53))
         }
         root.addView(TextView(this).apply {
             text = "PDFForge"
@@ -31,18 +31,18 @@ class MainActivity : Activity() {
             setTextColor(navy)
         })
         root.addView(TextView(this).apply {
-            text = "Your documents. Your tools. All offline."
+            text = "Your PDF studio • Private & offline"
             textSize = 15f
-            setTextColor(Color.rgb(99, 111, 130))
+            setTextColor(Color.rgb(182, 200, 229))
             setPadding(0, dp(5), 0, dp(28))
         })
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(22), dp(24), dp(22), dp(24))
-            background = shape(navy, 22)
+            background = shape(Color.rgb(37, 61, 102), 22)
         }
         hero.addView(TextView(this).apply {
-            text = "Make every PDF work for you"
+            text = "Create something great."
             textSize = 23f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(Color.WHITE)
@@ -62,12 +62,12 @@ class MainActivity : Activity() {
             setPadding(0, dp(28), 0, dp(14))
         })
         val tools = listOf(
-            Triple("⊕", "Merge PDFs", "merge"),
-            Triple("▦", "Organize", "organize"),
-            Triple("✂", "Extract pages", "extract"),
-            Triple("▤", "Split PDF", "split"),
-            Triple("◫", "Compress", "compress"),
-            Triple("▧", "Images to PDF", "images")
+            Triple("📑", "Merge PDFs", "merge"),
+            Triple("🗂", "Organize", "organize"),
+            Triple("📤", "Extract pages", "extract"),
+            Triple("✂️", "Split PDF", "split"),
+            Triple("🗜", "Compress", "compress"),
+            Triple("🖼", "Images to PDF", "images")
         )
         val grid = GridLayout(this).apply { columnCount = 2 }
         val width = (resources.displayMetrics.widthPixels - dp(52)) / 2
@@ -76,7 +76,7 @@ class MainActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(17), dp(18), dp(12), dp(18))
-                background = shape(Color.WHITE, 18)
+                background = shape(Color.rgb(35, 53, 82), 18)
                 elevation = dp(2).toFloat()
                 setOnClickListener {
                     val destination = if (op == "merge" || op == "organize" || op == "extract") PageEditorActivity::class.java else ToolActivity::class.java
@@ -92,7 +92,7 @@ class MainActivity : Activity() {
                 text = name
                 textSize = 16f
                 typeface = Typeface.DEFAULT_BOLD
-                setTextColor(navy)
+                setTextColor(Color.WHITE)
                 setPadding(0, dp(12), 0, 0)
             })
             grid.addView(card, GridLayout.LayoutParams().apply {
@@ -106,7 +106,7 @@ class MainActivity : Activity() {
             text = "Private by design • Files stay on your device"
             textSize = 12f
             gravity = Gravity.CENTER
-            setTextColor(Color.GRAY)
+            setTextColor(Color.rgb(182, 200, 229))
             setPadding(0, dp(24), 0, 0)
         })
         val scroll = ScrollView(this)
