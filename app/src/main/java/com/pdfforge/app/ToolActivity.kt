@@ -52,7 +52,7 @@ class ToolActivity : Activity() {
         operation = intent.getStringExtra("tool") ?: "images"
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(28, 40, 28, 24)
+            setPadding(22, 26, 22, 24)
             setBackgroundColor(Color.rgb(16, 29, 53))
         }
         fun card(title: String, subtitle: String, op: String): LinearLayout {
@@ -82,38 +82,42 @@ class ToolActivity : Activity() {
             card.addView(TextView(this).apply { text = subtitle; textSize = 13f; setTextColor(Color.rgb(205, 219, 239)) })
             return card
         }
-        layout.addView(TextView(this).apply { text = "PDFForge"; textSize = 34f; setTextColor(Color.WHITE); setPadding(0, 0, 0, 8) })
-        layout.addView(TextView(this).apply { text = "Your private PDF workspace • Offline"; textSize = 15f; setTextColor(Color.rgb(205, 219, 239)); setPadding(0, 0, 0, 22) })
-        layout.addView(TextView(this).apply { text = when(operation) { "images" -> "Images to PDF"; "pages" -> "Extract or Split Pages"; "split" -> "Split PDF"; else -> "Compress PDF" }; textSize = 25f; setTextColor(Color.WHITE); setPadding(0, 0, 0, 12) })
+        layout.addView(TextView(this).apply { text = "‹  " + when(operation) { "compress" -> "Compress PDF"; "pages" -> "Split / Extract"; else -> "Images to PDF" }; textSize = 26f; setTextColor(Color.WHITE); setPadding(0, 0, 0, 8); setOnClickListener { finish() } })
+        layout.addView(TextView(this).apply { text = "Private, offline document workspace"; textSize = 15f; setTextColor(Color.rgb(205, 219, 239)); setPadding(0, 0, 0, 22) })
+        
         workspace = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 20, 20, 20)
             background = GradientDrawable().apply {
-                setColor(Color.WHITE)
+                setColor(Color.rgb(29, 47, 77))
                 cornerRadius = 28f
-                setStroke(2, Color.rgb(218, 228, 242))
+                setStroke(1, Color.rgb(65, 83, 116))
             }
         }
         selectionTitle = TextView(this).apply {
             text = if (operation == "compress") "1  SELECT PDF" else "YOUR WORKSPACE"
             textSize = 18f
-            setTextColor(Color.rgb(23, 60, 103))
+            setTextColor(Color.WHITE)
             setPadding(0, 0, 0, 12)
         }
         workspace.addView(selectionTitle)
         filesPanel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         workspace.addView(filesPanel)
         workspace.addView(Button(this).apply {
-            text = if (operation == "compress") "Choose / change PDF" else "+ Add / change files"
+            text = if (operation == "compress") "+  Choose PDF" else "+  Add files"
             isAllCaps = false
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply { setColor(Color.rgb(55, 76, 117)); cornerRadius = 20f }
             setOnClickListener { if (operation.isNotEmpty()) chooseFiles() else status.text = "Choose a tool above first." }
         })
         layout.addView(workspace, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 14; bottomMargin = 12 })
         runButton = Button(this).apply { text = if (operation == "compress") "Compress PDF" else if (operation == "split") "Split into folder" else "Create PDF"; isEnabled = false; setOnClickListener { if (operation == "split" || (operation == "pages" && splitMode)) chooseSplitFolder() else processFiles() } }
-        runButton.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(242, 90, 96))
+        runButton.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(117, 91, 255))
         runButton.setTextColor(Color.WHITE)
         layout.addView(runButton)
         pagesInput = EditText(this).apply {
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.rgb(179, 194, 220))
             hint = "Pages to extract: e.g. 1,3-5 (blank = all)"
             inputType = android.text.InputType.TYPE_CLASS_TEXT
             setSingleLine(true)
@@ -157,18 +161,20 @@ class ToolActivity : Activity() {
                 "Medium  •  Balanced size and clarity",
                 "High  •  Smaller file, lower image quality"
             )
+            val choiceIds = mutableListOf<Int>()
             options.forEachIndexed { index, title ->
                 choices.addView(RadioButton(this).apply {
-                    id = View.generateViewId()
+                    id = View.generateViewId().also { choiceIds.add(it) }
                     text = title
                     textSize = 15f
                     setTextColor(Color.WHITE)
                     buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(242, 90, 96))
                     setPadding(8, 12, 8, 12)
                     isChecked = index == 0
-                    setOnClickListener { compressionLevel = index }
+
                 })
             }
+            choices.setOnCheckedChangeListener { _, checkedId -> compressionLevel = choiceIds.indexOf(checkedId).coerceAtLeast(0) }
             layout.addView(choices)
             layout.addView(TextView(this).apply {
                 text = "Medium and High may flatten pages and remove selectable text."
