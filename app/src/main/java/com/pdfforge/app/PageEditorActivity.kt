@@ -62,7 +62,7 @@ class PageEditorActivity : Activity() {
             "merge" -> "Merge PDFs"
             "extract" -> "Split / Extract"
             else -> "Organize PDF"
-        }, 23f).apply { typeface = Typeface.DEFAULT_BOLD }
+        }, 23f).apply { typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
         header.setOnClickListener { finish() }
         outer.addView(header)
         outer.addView(label("Arrange pages • Hold to reorder • Tap for options", 12f, ThemePrefs.secondary(this)).apply { setPadding(0, dp(3), 0, dp(14)) })
@@ -286,7 +286,7 @@ class PageEditorActivity : Activity() {
             val tile = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(5), dp(5), dp(5), dp(7))
-                background = rounded(if (index == activePage) Color.rgb(65, 85, 147) else ThemePrefs.surface(this@PageEditorActivity), 10)
+                background = StudioStyle.surface(this@PageEditorActivity, 10, index == activePage)
             }
             val thumb = ImageView(this).apply {
                 scaleType = ImageView.ScaleType.FIT_CENTER
