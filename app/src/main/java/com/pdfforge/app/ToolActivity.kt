@@ -45,6 +45,7 @@ class ToolActivity : Activity() {
     private lateinit var selectionTitle: TextView
     private lateinit var workspace: LinearLayout
     private var sourceBytes: Long = 0L
+    private var compressionNote = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -427,7 +428,7 @@ class ToolActivity : Activity() {
                             val after = file.length()
                             if (before > 0) {
                                 val percent = ((before - after).coerceAtLeast(0L) * 100.0 / before).toInt()
-                                "3  RESULT: Original ${before / 1024} KB, Result ${after / 1024} KB, Saved $percent%"
+                                "3  RESULT: Original ${before / 1024} KB, Result ${after / 1024} KB, Saved $percent%\n$compressionNote"
                             } else "3  RESULT: ${after / 1024} KB"
                         } else "Ready: ${file.length() / 1024} KB. Preview or save."
                         saveButton.isEnabled = true
@@ -625,9 +626,12 @@ class ToolActivity : Activity() {
             }
             // A PDF rewrite is not guaranteed to reduce size. Preserve the original
             // rather than deliver a larger file labelled as compressed.
-            if (output.length() >= source.length()) {
+            val produced = output.length()
+            require(produced > 0L) { "Compression produced an empty PDF" }
+            compressionNote = if (produced >= source.length()) {
                 source.copyTo(output, overwrite = true)
-            }
+                "No reduction possible at this setting; original PDF retained."
+            } else "Compression complete using ${if (level == 0) "Low" else if (level == 1) "Medium" else "High"} quality."
         } finally { source.delete() }
     }
 
@@ -665,7 +669,7 @@ class ToolActivity : Activity() {
     }
     private fun compressRaster(source: File, output: File, level: Int) {
         val quality = if (level == 1) 65 else 35
-        val scale = if (level == 1) 1.2f else 0.8f
+        val scale = if (level == 1) 1.0f else 0.65f
         PDDocument().use { compressed ->
             ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
                 PdfRenderer(fd).use { renderer ->
@@ -673,7 +677,7 @@ class ToolActivity : Activity() {
                         renderer.openPage(index).use { original ->
                             val w = (original.width * scale).toInt().coerceAtLeast(1)
                             val h = (original.height * scale).toInt().coerceAtLeast(1)
-                            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565)
+                            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                             try {
                                 bitmap.eraseColor(Color.WHITE)
                                 original.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
@@ -685,7 +689,7 @@ class ToolActivity : Activity() {
                                     com.tom_roush.pdfbox.pdmodel.common.PDRectangle(original.width.toFloat(), original.height.toFloat())
                                 )
                                 compressed.addPage(page)
-                                val image = com.tom_roush.pdfbox.pdmodel.graphics.image.JPEGFactory.createFromByteArray(compressed, bytes)
+                                val image = com.tom_roush.pdfbox.pdmodel.graphics.image.JPEGFactory.createFromStream(compressed, java.io.ByteArrayInputStream(bytes))
                                 com.tom_roush.pdfbox.pdmodel.PDPageContentStream(compressed, page).use { canvas ->
                                     canvas.drawImage(image, 0f, 0f, original.width.toFloat(), original.height.toFloat())
                                 }
