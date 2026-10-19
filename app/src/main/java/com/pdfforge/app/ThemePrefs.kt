@@ -18,9 +18,9 @@ object ThemePrefs {
     fun set(activity: Activity, mode: String) {
         activity.getSharedPreferences(PREFS, 0).edit().putString(KEY, mode).apply()
     }
-    fun background(activity: Activity) = if (dark(activity)) Color.rgb(16, 29, 53) else Color.rgb(248, 250, 255)
-    fun surface(activity: Activity) = if (dark(activity)) Color.rgb(35, 53, 82) else Color.WHITE
-    fun foreground(activity: Activity) = if (dark(activity)) Color.WHITE else Color.rgb(24, 39, 67)
-    fun secondary(activity: Activity) = if (dark(activity)) Color.rgb(190, 207, 232) else Color.rgb(89, 108, 140)
-    val accent = Color.rgb(107, 83, 245)
+    fun background(activity: Activity) = if (dark(activity)) Color.rgb(15, 23, 35) else Color.rgb(246, 248, 250)
+    fun surface(activity: Activity) = if (dark(activity)) Color.rgb(28, 40, 55) else Color.WHITE
+    fun foreground(activity: Activity) = if (dark(activity)) Color.WHITE else Color.rgb(25, 37, 51)
+    fun secondary(activity: Activity) = if (dark(activity)) Color.rgb(168, 185, 200) else Color.rgb(99, 115, 131)
+    val accent = Color.rgb(65, 190, 169)
 }
