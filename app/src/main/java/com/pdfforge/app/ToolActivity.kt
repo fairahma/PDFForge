@@ -200,8 +200,16 @@ class ToolActivity : Activity() {
                 startActivity(Intent(this@ToolActivity, PageEditorActivity::class.java).putExtra("tool", "extract"))
             }
         })
-        val scroll = ScrollView(this)
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(ThemePrefs.background(this@ToolActivity))
+            isFillViewport = true
+        }
         scroll.addView(layout)
+        window.statusBarColor = ThemePrefs.background(this)
+        window.navigationBarColor = ThemePrefs.background(this)
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = if (ThemePrefs.dark(this)) 0 else
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         setContentView(scroll)
         SafeArea.apply(this, scroll)
         showSelectedFiles()
@@ -255,7 +263,7 @@ class ToolActivity : Activity() {
             filesPanel.addView(TextView(this).apply {
                 text = "No files selected yet. Choose a tool above to add your documents."
                 textSize = 15f
-                setTextColor(Color.rgb(182, 200, 229))
+                setTextColor(ThemePrefs.secondary(this@ToolActivity))
                 setPadding(0, 12, 0, 20)
             })
             if (::runButton.isInitialized) runButton.isEnabled = false
@@ -273,7 +281,7 @@ class ToolActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 setPadding(14, 14, 14, 14)
                 background = GradientDrawable().apply {
-                    setColor(Color.rgb(245, 248, 253))
+                    setColor(ThemePrefs.surface(this@ToolActivity))
                     cornerRadius = 18f
                 }
             }
@@ -287,14 +295,14 @@ class ToolActivity : Activity() {
             detail.addView(TextView(this).apply {
                 text = metadata.first
                 textSize = 15f
-                setTextColor(Color.rgb(30, 43, 63))
+                setTextColor(ThemePrefs.foreground(this@ToolActivity))
                 maxLines = 2
                 ellipsize = android.text.TextUtils.TruncateAt.END
             })
             detail.addView(TextView(this).apply {
                 text = if (metadata.second > 0) "${metadata.second / 1024} KB • Item ${index + 1}" else "Item ${index + 1}"
                 textSize = 12f
-                setTextColor(Color.GRAY)
+                setTextColor(ThemePrefs.secondary(this@ToolActivity))
             })
             heading.addView(detail, LinearLayout.LayoutParams(0, -2, 1f))
             tile.addView(heading)
