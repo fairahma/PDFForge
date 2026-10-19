@@ -27,7 +27,7 @@ class MainActivity : Activity() {
         root.addView(TextView(this).apply {
             text = "PDFForge"
             textSize = 32f
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             setTextColor(navy)
         })
         val settings = TextView(this).apply {
@@ -122,10 +122,10 @@ class MainActivity : Activity() {
             text = "Private by design • Files stay on your device"
             textSize = 12f
             gravity = Gravity.CENTER
-            setTextColor(Color.rgb(182, 200, 229))
+            setTextColor(ThemePrefs.secondary(this@MainActivity))
             setPadding(0, dp(24), 0, 0)
         })
-        val scroll = ScrollView(this)
+        val scroll = ScrollView(this).apply { setBackgroundColor(ThemePrefs.background(this@MainActivity)); isFillViewport = true }
         scroll.addView(root)
         setContentView(scroll)
         SafeArea.apply(this, scroll)
