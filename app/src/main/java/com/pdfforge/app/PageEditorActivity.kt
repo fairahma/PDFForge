@@ -190,6 +190,42 @@ class PageEditorActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != RESULT_OK || data == null) return
+        if (requestCode == folderRequest) {
+            val tree = data.data ?: return
+            val snapshot = pages.toList()
+            val cuts = splitCuts.toList()
+            thread {
+                try {
+                    val docs = sources.map { PDDocument.load(it) }
+                    try {
+                        val bounds = listOf(0) + cuts + listOf(snapshot.size)
+                        val parent = android.provider.DocumentsContract.buildDocumentUriUsingTree(
+                            tree, android.provider.DocumentsContract.getTreeDocumentId(tree))
+                        for (part in 0 until bounds.lastIndex) {
+                            val destination = android.provider.DocumentsContract.createDocument(
+                                contentResolver, parent, "application/pdf", "PDFForge_part_${part + 1}.pdf")
+                                ?: error("Cannot create output file")
+                            val temporary = File.createTempFile("part_", ".pdf", cacheDir)
+                            try {
+                                PDDocument().use { pdf ->
+                                    snapshot.subList(bounds[part], bounds[part + 1]).forEach { ref ->
+                                        pdf.importPage(docs[ref.source].getPage(ref.page))
+                                    }
+                                    pdf.save(temporary)
+                                }
+                                contentResolver.openOutputStream(destination)?.use { stream ->
+                                    temporary.inputStream().use { it.copyTo(stream) }
+                                } ?: error("Cannot write output")
+                            } finally { temporary.delete() }
+                        }
+                    } finally { docs.forEach { it.close() } }
+                    runOnUiThread { info.text = "Saved ${cuts.size + 1} PDF files" }
+                } catch (e: Exception) {
+                    runOnUiThread { info.text = "Split failed: ${e.message}" }
+                }
+            }
+            return
+        }
         if (requestCode == saveRequest) {
             val file = output ?: return
             try {
@@ -369,6 +405,20 @@ class PageEditorActivity : Activity() {
                 runOnUiThread { if (dialog.isShowing) stack.addView(label("Preview failed: ${e.message}", 14f, Color.RED)) }
             }
         }
+    }
+
+    private fun saveSplit() {
+        if (pages.isEmpty()) return
+        try {
+            val raw = extractInput?.text?.toString()?.trim().orEmpty()
+            require(raw.isNotBlank()) { "Enter split boundaries, e.g. 3,7" }
+            val cuts = raw.split(",").map { it.trim().toIntOrNull() ?: error("Invalid page number") }
+            require(cuts == cuts.distinct().sorted() && cuts.all { it > 0 && it < pages.size }) {
+                "Boundaries must be increasing and before the last page"
+            }
+            splitCuts = cuts
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), folderRequest)
+        } catch (e: Exception) { info.text = e.message ?: "Invalid split selection" }
     }
 
     private fun requestedPages(): List<PageRef> {
