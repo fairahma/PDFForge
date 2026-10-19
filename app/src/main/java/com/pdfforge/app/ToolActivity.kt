@@ -60,11 +60,7 @@ class ToolActivity : Activity() {
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(28, 24, 28, 24)
-                background = GradientDrawable().apply {
-                    setColor(ThemePrefs.surface(this@ToolActivity))
-                    cornerRadius = 28f
-                    setStroke(1, Color.rgb(221, 229, 239))
-                }
+                background = StudioStyle.surface(this@ToolActivity)
                 setOnClickListener {
                     if (op == "merge" || op == "extract" || op == "organize") {
                         startActivity(Intent(this@ToolActivity, PageEditorActivity::class.java).putExtra("tool", op))
@@ -89,11 +85,7 @@ class ToolActivity : Activity() {
         workspace = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 20, 20, 20)
-            background = GradientDrawable().apply {
-                setColor(ThemePrefs.surface(this@ToolActivity))
-                cornerRadius = 28f
-                setStroke(1, Color.rgb(65, 83, 116))
-            }
+            background = StudioStyle.surface(this@ToolActivity)
         }
         selectionTitle = TextView(this).apply {
             text = if (operation == "compress") "1  SELECT PDF" else "YOUR WORKSPACE"
@@ -244,15 +236,42 @@ class ToolActivity : Activity() {
         val scroll = ScrollView(this).apply {
             setBackgroundColor(ThemePrefs.background(this@ToolActivity))
             isFillViewport = true
+            clipToPadding = false
         }
         scroll.addView(layout)
+        val screen = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(ThemePrefs.background(this@ToolActivity))
+        }
+        screen.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        if (operation == "compress") {
+            (runButton.parent as? ViewGroup)?.removeView(runButton)
+            val footer = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(StudioStyle.dp(this@ToolActivity, 16),
+                    StudioStyle.dp(this@ToolActivity, 10),
+                    StudioStyle.dp(this@ToolActivity, 16),
+                    StudioStyle.dp(this@ToolActivity, 10))
+                setBackgroundColor(ThemePrefs.background(this@ToolActivity))
+            }
+            runButton.text = "Compress PDF"
+            runButton.textSize = 16f
+            runButton.isAllCaps = false
+            runButton.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            runButton.background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.rgb(91, 73, 238), Color.rgb(117, 83, 250))
+            ).apply { cornerRadius = StudioStyle.dp(this@ToolActivity, 14).toFloat() }
+            footer.addView(runButton, LinearLayout.LayoutParams(-1, StudioStyle.dp(this, 54)))
+            screen.addView(footer)
+        }
         window.statusBarColor = ThemePrefs.background(this)
         window.navigationBarColor = ThemePrefs.background(this)
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = if (ThemePrefs.dark(this)) 0 else
             View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-        setContentView(scroll)
-        SafeArea.apply(this, scroll)
+        setContentView(screen)
+        SafeArea.apply(this, screen)
         showSelectedFiles()
         chooseFiles()
     }
@@ -322,10 +341,7 @@ class ToolActivity : Activity() {
             val tile = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(14, 14, 14, 14)
-                background = GradientDrawable().apply {
-                    setColor(ThemePrefs.surface(this@ToolActivity))
-                    cornerRadius = 18f
-                }
+                background = StudioStyle.surface(this@ToolActivity, 12)
             }
             val heading = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
             heading.addView(TextView(this).apply {
