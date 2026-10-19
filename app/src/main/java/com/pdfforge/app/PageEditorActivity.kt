@@ -25,7 +25,11 @@ class PageEditorActivity : Activity() {
     private data class PageRef(val source: Int, val page: Int)
     private val sources = mutableListOf<File>()
     private val pages = mutableListOf<PageRef>()
-    private lateinit var grid: GridLayout
+    private lateinit var grid: LinearLayout
+    private lateinit var canvas: ImageView
+    private lateinit var pageTitle: TextView
+    private var activePage = 0
+    private var renderGeneration = 0
     private lateinit var info: TextView
     private lateinit var save: Button
     private var extractInput: EditText? = null
@@ -33,8 +37,11 @@ class PageEditorActivity : Activity() {
     private var mode = "organize"
     private val pickRequest = 201
     private val saveRequest = 202
-    private val navy = Color.rgb(235, 242, 255)
-    private val blue = Color.rgb(242, 90, 96)
+    private val folderRequest = 203
+    private var splitMode = false
+    private var splitCuts = emptyList<Int>()
+    private val navy get() = ThemePrefs.foreground(this)
+    private val blue = ThemePrefs.accent
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun rounded(color: Int, radius: Int = 16) = GradientDrawable().apply {
         setColor(color); cornerRadius = dp(radius).toFloat()
@@ -48,17 +55,17 @@ class PageEditorActivity : Activity() {
         title = "PDFForge"
         val outer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(16, 29, 53))
+            setBackgroundColor(ThemePrefs.background(this@PageEditorActivity))
             setPadding(dp(16), dp(18), dp(16), dp(10))
         }
         val header = label("‹  " + when(mode) {
             "merge" -> "Merge PDFs"
-            "extract" -> "Extract pages"
+            "extract" -> "Split / Extract"
             else -> "Organize PDF"
         }, 23f).apply { typeface = Typeface.DEFAULT_BOLD }
         header.setOnClickListener { finish() }
         outer.addView(header)
-        outer.addView(label("Arrange pages • Hold to reorder • Tap for options", 12f, Color.rgb(182, 200, 229)).apply { setPadding(0, dp(3), 0, dp(14)) })
+        outer.addView(label("Arrange pages • Hold to reorder • Tap for options", 12f, ThemePrefs.secondary(this)).apply { setPadding(0, dp(3), 0, dp(14)) })
         val toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(5), 0, dp(5)) }
         val add = Button(this).apply {
             text = "+  Add files"
@@ -78,7 +85,22 @@ class PageEditorActivity : Activity() {
         preview.setTextColor(Color.WHITE)
         outer.addView(toolbar)
         if (mode == "extract") {
-            outer.addView(label("Pages to extract (e.g. 1,3,5-8)", 14f))
+            val switcher = RadioGroup(this).apply { orientation = RadioGroup.HORIZONTAL }
+            val extractRadio = RadioButton(this).apply {
+                id = View.generateViewId(); text = "Extract"; setTextColor(navy); isChecked = true
+            }
+            val splitRadio = RadioButton(this).apply {
+                id = View.generateViewId(); text = "Split"; setTextColor(navy)
+            }
+            switcher.addView(extractRadio)
+            switcher.addView(splitRadio)
+            outer.addView(switcher)
+            switcher.setOnCheckedChangeListener { _, checked ->
+                splitMode = checked == splitRadio.id
+                extractInput?.hint = if (splitMode) "Split after page numbers: 3,7" else "Extract: 1,3,5-8"
+                if (::save.isInitialized) save.text = if (splitMode) "Save split PDFs" else "Extract selected pages"
+            }
+            outer.addView(label("Page selection", 13f))
             extractInput = EditText(this).apply {
                 hint = "1,3,5-8  •  Blank = all pages"
                 setSingleLine(true)
@@ -89,20 +111,68 @@ class PageEditorActivity : Activity() {
             }
             outer.addView(extractInput)
         }
-        info = label("Select a PDF to begin", 13f, Color.rgb(185, 201, 225))
+        info = label("Select a PDF to begin", 13f, ThemePrefs.secondary(this))
         info.setPadding(0, dp(20), 0, dp(12))
         outer.addView(info)
-        val scroll = ScrollView(this)
-        grid = GridLayout(this).apply { columnCount = 2 }
-        scroll.addView(grid)
-        outer.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        val workspace = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val railScroll = ScrollView(this).apply { background = rounded(ThemePrefs.surface(this), 14) }
+        grid = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(5), dp(8), dp(5), dp(8))
+        }
+        railScroll.addView(grid)
+        workspace.addView(railScroll, LinearLayout.LayoutParams(dp(104), -1))
+        val viewer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(9), dp(8), dp(9), dp(8))
+        }
+        pageTitle = label("Select a page", 13f, ThemePrefs.secondary(this)).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(4), 0, 0, dp(8))
+        }
+        viewer.addView(pageTitle)
+        val pageScroll = ScrollView(this).apply { fillViewport = true }
+        canvas = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            adjustViewBounds = true
+            setBackgroundColor(Color.WHITE)
+        }
+        pageScroll.addView(canvas, ScrollView.LayoutParams(-1, -2))
+        viewer.addView(pageScroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val remove = Button(this).apply {
+            text = "Delete"
+            isAllCaps = false
+            background = rounded(Color.rgb(77, 46, 67), 12)
+            setTextColor(Color.WHITE)
+            setOnClickListener {
+                if (pages.isNotEmpty()) {
+                    pages.removeAt(activePage.coerceIn(0, pages.lastIndex))
+                    activePage = activePage.coerceAtMost((pages.size - 1).coerceAtLeast(0))
+                    output = null
+                    refresh()
+                }
+            }
+        }
+        actions.addView(remove, LinearLayout.LayoutParams(0, dp(44), 1f))
+        val view = Button(this).apply {
+            text = "Full view"
+            isAllCaps = false
+            background = rounded(Color.rgb(42, 63, 99), 12)
+            setTextColor(Color.WHITE)
+            setOnClickListener { if (pages.isNotEmpty()) showSourcePage(pages[activePage]) }
+        }
+        actions.addView(view, LinearLayout.LayoutParams(0, dp(44), 1f).apply { leftMargin = dp(8) })
+        viewer.addView(actions)
+        workspace.addView(viewer, LinearLayout.LayoutParams(0, -1, 1f))
+        outer.addView(workspace, LinearLayout.LayoutParams(-1, 0, 1f))
         save = Button(this).apply {
-            text = if (mode == "merge") "Review & save merged PDF" else "Review & save PDF"
+            text = if (mode == "merge") "Review & save merged PDF" else if (mode == "extract") "Extract selected pages" else "Review & save PDF"
             isAllCaps = false
             setTextColor(Color.WHITE)
             background = rounded(blue, 14)
             isEnabled = false
-            setOnClickListener { buildResult(true) }
+            setOnClickListener { if (mode == "extract" && splitMode) saveSplit() else buildResult(true) }
         }
         outer.addView(save, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(10) })
         setContentView(outer)
@@ -120,6 +190,42 @@ class PageEditorActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != RESULT_OK || data == null) return
+        if (requestCode == folderRequest) {
+            val tree = data.data ?: return
+            val snapshot = pages.toList()
+            val cuts = splitCuts.toList()
+            thread {
+                try {
+                    val docs = sources.map { PDDocument.load(it) }
+                    try {
+                        val bounds = listOf(0) + cuts + listOf(snapshot.size)
+                        val parent = android.provider.DocumentsContract.buildDocumentUriUsingTree(
+                            tree, android.provider.DocumentsContract.getTreeDocumentId(tree))
+                        for (part in 0 until bounds.lastIndex) {
+                            val destination = android.provider.DocumentsContract.createDocument(
+                                contentResolver, parent, "application/pdf", "PDFForge_part_${part + 1}.pdf")
+                                ?: error("Cannot create output file")
+                            val temporary = File.createTempFile("part_", ".pdf", cacheDir)
+                            try {
+                                PDDocument().use { pdf ->
+                                    snapshot.subList(bounds[part], bounds[part + 1]).forEach { ref ->
+                                        pdf.importPage(docs[ref.source].getPage(ref.page))
+                                    }
+                                    pdf.save(temporary)
+                                }
+                                contentResolver.openOutputStream(destination)?.use { stream ->
+                                    temporary.inputStream().use { it.copyTo(stream) }
+                                } ?: error("Cannot write output")
+                            } finally { temporary.delete() }
+                        }
+                    } finally { docs.forEach { it.close() } }
+                    runOnUiThread { info.text = "Saved ${cuts.size + 1} PDF files" }
+                } catch (e: Exception) {
+                    runOnUiThread { info.text = "Split failed: ${e.message}" }
+                }
+            }
+            return
+        }
         if (requestCode == saveRequest) {
             val file = output ?: return
             try {
@@ -167,56 +273,68 @@ class PageEditorActivity : Activity() {
     }
     private fun refresh() {
         grid.removeAllViews()
-        info.text = "${pages.size} pages  •  Hold to reorder"
+        info.text = "${pages.size} PAGES  •  Long-press thumbnails to reorder"
         save.isEnabled = pages.isNotEmpty()
-        val tileWidth = (resources.displayMetrics.widthPixels - dp(44)) / 2
+        if (pages.isEmpty()) {
+            pageTitle.text = "No pages selected"
+            canvas.setImageDrawable(null)
+            return
+        }
+        activePage = activePage.coerceIn(0, pages.lastIndex)
         pages.toList().forEachIndexed { index, ref ->
             val tile = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(dp(7), dp(7), dp(7), dp(9))
-                background = rounded(Color.rgb(33, 49, 75), 12)
-                elevation = dp(1).toFloat()
+                setPadding(dp(5), dp(5), dp(5), dp(7))
+                background = rounded(if (index == activePage) Color.rgb(65, 85, 147) else ThemePrefs.surface(this), 10)
             }
-            val image = ImageView(this).apply {
+            val thumb = ImageView(this).apply {
                 scaleType = ImageView.ScaleType.FIT_CENTER
                 setBackgroundColor(Color.WHITE)
             }
-            tile.addView(image, LinearLayout.LayoutParams(-1, dp(165)))
-            tile.addView(label("Page ${index + 1}   ·   ⋮", 12f, Color.rgb(205, 221, 241)).apply { setPadding(dp(5), dp(8), 0, 0) })
-            tile.setOnClickListener {
-                AlertDialog.Builder(this).setTitle("Page ${index + 1}")
-                    .setItems(arrayOf("View page", "Remove page")) { _, choice ->
-                        if (choice == 0) showSourcePage(ref)
-                        else { pages.removeAt(index); output = null; refresh() }
-                    }.show()
-            }
+            tile.addView(thumb, LinearLayout.LayoutParams(-1, dp(110)))
+            tile.addView(label("${index + 1}  ⋮", 12f, if (index == activePage) Color.WHITE else navy).apply {
+                gravity = Gravity.CENTER
+                setPadding(0, dp(4), 0, 0)
+            })
+            tile.setOnClickListener { activePage = index; refresh() }
             tile.setOnLongClickListener {
-                val data = ClipData.newPlainText("page", index.toString())
-                tile.startDragAndDrop(data, View.DragShadowBuilder(tile), index, 0)
+                tile.startDragAndDrop(ClipData.newPlainText("page", index.toString()), View.DragShadowBuilder(tile), index, 0)
                 true
             }
             tile.setOnDragListener { _, event ->
                 if (event.action == DragEvent.ACTION_DROP) {
                     val from = event.localState as? Int ?: return@setOnDragListener true
                     if (from in pages.indices && index in pages.indices && from != index) {
-                        val item = pages.removeAt(from)
-                        pages.add(index, item)
+                        val moved = pages.removeAt(from)
+                        pages.add(index, moved)
+                        activePage = index
                         output = null
                         refresh()
                     }
                 }
                 true
             }
-            grid.addView(tile, GridLayout.LayoutParams().apply {
-                width = tileWidth - dp(8)
-                height = -2
-                setMargins(dp(4), dp(6), dp(4), dp(6))
-            })
+            grid.addView(tile, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
             thread {
                 try {
-                    val bitmap = renderPage(sources[ref.source], ref.page, 300)
-                    runOnUiThread { if (tile.parent != null) image.setImageBitmap(bitmap) else bitmap.recycle() }
+                    val bitmap = renderPage(sources[ref.source], ref.page, 150)
+                    runOnUiThread { if (tile.parent != null) thumb.setImageBitmap(bitmap) else bitmap.recycle() }
                 } catch (_: Exception) { }
+            }
+        }
+        pageTitle.text = "Page ${activePage + 1} of ${pages.size}"
+        val ref = pages[activePage]
+        val generation = ++renderGeneration
+        canvas.setImageDrawable(null)
+        thread {
+            try {
+                val bitmap = renderPage(sources[ref.source], ref.page, 750)
+                runOnUiThread {
+                    if (generation == renderGeneration) canvas.setImageBitmap(bitmap)
+                    else bitmap.recycle()
+                }
+            } catch (e: Exception) {
+                runOnUiThread { if (generation == renderGeneration) pageTitle.text = "Unable to render page" }
             }
         }
     }
@@ -287,6 +405,20 @@ class PageEditorActivity : Activity() {
                 runOnUiThread { if (dialog.isShowing) stack.addView(label("Preview failed: ${e.message}", 14f, Color.RED)) }
             }
         }
+    }
+
+    private fun saveSplit() {
+        if (pages.isEmpty()) return
+        try {
+            val raw = extractInput?.text?.toString()?.trim().orEmpty()
+            require(raw.isNotBlank()) { "Enter split boundaries, e.g. 3,7" }
+            val cuts = raw.split(",").map { it.trim().toIntOrNull() ?: error("Invalid page number") }
+            require(cuts == cuts.distinct().sorted() && cuts.all { it > 0 && it < pages.size }) {
+                "Boundaries must be increasing and before the last page"
+            }
+            splitCuts = cuts
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), folderRequest)
+        } catch (e: Exception) { info.text = e.message ?: "Invalid split selection" }
     }
 
     private fun requestedPages(): List<PageRef> {
