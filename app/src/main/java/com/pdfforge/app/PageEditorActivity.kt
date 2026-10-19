@@ -6,6 +6,7 @@ import android.content.ClipData
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.pdf.PdfRenderer
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -54,24 +55,23 @@ class PageEditorActivity : Activity() {
             "merge" -> "Merge PDFs"
             "extract" -> "Extract pages"
             else -> "Organize PDF"
-        }, 26f)
+        }, 23f).apply { typeface = Typeface.DEFAULT_BOLD }
         header.setOnClickListener { finish() }
         outer.addView(header)
-        outer.addView(label("PDFForge Studio  •  Visual page editor", 13f, Color.rgb(242, 90, 96)))
-        outer.addView(label("Hold and drag a page to reorder. Tap a page to view or remove it.", 13f, Color.rgb(182, 200, 229)))
-        val toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        outer.addView(label("Arrange pages • Hold to reorder • Tap for options", 12f, Color.rgb(182, 200, 229)).apply { setPadding(0, dp(3), 0, dp(14)) })
+        val toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(5), 0, dp(5)) }
         val add = Button(this).apply {
             text = "+ Add PDF"
             isAllCaps = false
             setOnClickListener { pickFiles() }
         }
-        toolbar.addView(add, LinearLayout.LayoutParams(0, -2, 1f))
+        toolbar.addView(add, LinearLayout.LayoutParams(0, dp(48), 1f).apply { rightMargin = dp(6) })
         val preview = Button(this).apply {
             text = "Preview"
             isAllCaps = false
             setOnClickListener { buildResult(true) }
         }
-        toolbar.addView(preview, LinearLayout.LayoutParams(0, -2, 1f))
+        toolbar.addView(preview, LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(6) })
         add.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(65, 92, 137))
         add.setTextColor(Color.WHITE)
         preview.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(65, 92, 137))
@@ -90,21 +90,21 @@ class PageEditorActivity : Activity() {
             outer.addView(extractInput)
         }
         info = label("Choose a PDF to start editing.", 14f)
-        info.setPadding(0, dp(12), 0, dp(12))
+        info.setPadding(0, dp(20), 0, dp(12))
         outer.addView(info)
         val scroll = ScrollView(this)
         grid = GridLayout(this).apply { columnCount = 2 }
         scroll.addView(grid)
         outer.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         save = Button(this).apply {
-            text = "Preview & Save PDF"
+            text = if (mode == "merge") "Review & save merged PDF" else "Review & save PDF"
             isAllCaps = false
             setTextColor(Color.WHITE)
-            background = rounded(blue)
+            background = rounded(blue, 14)
             isEnabled = false
             setOnClickListener { buildResult(true) }
         }
-        outer.addView(save, LinearLayout.LayoutParams(-1, dp(56)))
+        outer.addView(save, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(10) })
         setContentView(outer)
         pickFiles()
     }
@@ -167,22 +167,22 @@ class PageEditorActivity : Activity() {
     }
     private fun refresh() {
         grid.removeAllViews()
-        info.text = "${pages.size} pages • Long-press and drag to rearrange"
+        info.text = "${pages.size} pages  •  Hold to reorder"
         save.isEnabled = pages.isNotEmpty()
         val tileWidth = (resources.displayMetrics.widthPixels - dp(48)) / 2
         pages.toList().forEachIndexed { index, ref ->
             val tile = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(dp(8), dp(8), dp(8), dp(8))
-                background = rounded(Color.rgb(35, 53, 82))
-                elevation = dp(2).toFloat()
+                setPadding(dp(7), dp(7), dp(7), dp(9))
+                background = rounded(Color.rgb(33, 49, 75), 12)
+                elevation = dp(1).toFloat()
             }
             val image = ImageView(this).apply {
                 scaleType = ImageView.ScaleType.FIT_CENTER
                 setBackgroundColor(Color.rgb(225, 233, 246))
             }
             tile.addView(image, LinearLayout.LayoutParams(-1, dp(165)))
-            tile.addView(label("Page ${index + 1}", 14f))
+            tile.addView(label("Page ${index + 1}   ·   ⋮", 12f, Color.rgb(205, 221, 241)).apply { setPadding(dp(5), dp(8), 0, 0) })
             tile.setOnClickListener {
                 AlertDialog.Builder(this).setTitle("Page ${index + 1}")
                     .setItems(arrayOf("View page", "Remove page")) { _, choice ->
@@ -210,7 +210,7 @@ class PageEditorActivity : Activity() {
             grid.addView(tile, GridLayout.LayoutParams().apply {
                 width = tileWidth - dp(8)
                 height = -2
-                setMargins(dp(4), dp(5), dp(4), dp(5))
+                setMargins(dp(4), dp(6), dp(4), dp(6))
             })
             thread {
                 try {
