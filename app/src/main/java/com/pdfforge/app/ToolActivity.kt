@@ -362,11 +362,18 @@ class ToolActivity : Activity() {
                         "merge" -> mergePdfs(uris, file)
                         "extract", "pages" -> extractPages(uris.first(), file, pageSelection)
                         "split" -> splitPages(uris.first(), file)
-                        "compress" -> renderToPdf(uris, file, 55, false)
+                        "compress" -> compressPdf(uris.first(), file)
                     }
                     result = file
                     resultIsZip = zip
-                    runOnUiThread { status.text = "Ready: ${file.length() / 1024} KB. Preview or save."; saveButton.isEnabled = true; previewButton.isEnabled = !zip; runButton.isEnabled = true }
+                    runOnUiThread {
+                        status.text = if (activeOperation == "compress") {
+                            "Finished: ${file.length() / 1024} KB. Original text and image quality preserved. Some PDFs cannot be reduced without quality loss."
+                        } else "Ready: ${file.length() / 1024} KB. Preview or save."
+                        saveButton.isEnabled = true
+                        previewButton.isEnabled = !zip
+                        runButton.isEnabled = true
+                    }
                 } catch (e: Exception) {
                     runOnUiThread { status.text = "Failed: ${e.message}"; runButton.isEnabled = true }
                 }
@@ -541,6 +548,23 @@ class ToolActivity : Activity() {
 
     // Android's built-in PDF APIs render pages to images. This is a rasterized
     // implementation: selectable text, vector graphics and links are not preserved.
+    private fun compressPdf(uri: Uri, output: File) {
+        val source = copySource(uri)
+        try {
+            PDDocument.load(source).use { document ->
+                // Lossless PDF rewrite: preserve selectable text, vector graphics,
+                // annotations, and original image resolution.
+                document.isAllSecurityToBeRemoved = true
+                document.save(output)
+            }
+            // A PDF rewrite is not guaranteed to reduce size. Preserve the original
+            // rather than deliver a larger file labelled as compressed.
+            if (output.length() >= source.length()) {
+                source.copyTo(output, overwrite = true)
+            }
+        } finally { source.delete() }
+    }
+
     private fun renderToPdf(uris: List<Uri>, file: File, quality: Int, firstPageOnly: Boolean) {
         val doc = PdfDocument()
         var pageNumber = 1
