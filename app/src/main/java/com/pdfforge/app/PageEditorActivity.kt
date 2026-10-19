@@ -41,7 +41,7 @@ class PageEditorActivity : Activity() {
     private var splitMode = false
     private var splitCuts = emptyList<Int>()
     private val navy get() = ThemePrefs.foreground(this)
-    private val blue = Color.rgb(242, 90, 96)
+    private val blue = ThemePrefs.accent
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun rounded(color: Int, radius: Int = 16) = GradientDrawable().apply {
         setColor(color); cornerRadius = dp(radius).toFloat()
@@ -60,7 +60,7 @@ class PageEditorActivity : Activity() {
         }
         val header = label("‹  " + when(mode) {
             "merge" -> "Merge PDFs"
-            "extract" -> "Extract pages"
+            "extract" -> "Split / Extract"
             else -> "Organize PDF"
         }, 23f).apply { typeface = Typeface.DEFAULT_BOLD }
         header.setOnClickListener { finish() }
@@ -292,7 +292,7 @@ class PageEditorActivity : Activity() {
                 setBackgroundColor(Color.WHITE)
             }
             tile.addView(thumb, LinearLayout.LayoutParams(-1, dp(110)))
-            tile.addView(label("${index + 1}  ⋮", 12f, Color.WHITE).apply {
+            tile.addView(label("${index + 1}  ⋮", 12f, if (index == activePage) Color.WHITE else navy).apply {
                 gravity = Gravity.CENTER
                 setPadding(0, dp(4), 0, 0)
             })
