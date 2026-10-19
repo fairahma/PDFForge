@@ -7,6 +7,11 @@ import android.view.WindowInsets
 /** Keep content clear of Android status and navigation bars, including edge-to-edge devices. */
 object SafeArea {
     fun apply(activity: Activity, root: View) {
+        activity.window.statusBarColor = ThemePrefs.background(activity)
+        activity.window.navigationBarColor = ThemePrefs.background(activity)
+        @Suppress("DEPRECATION")
+        activity.window.decorView.systemUiVisibility = if (ThemePrefs.dark(activity)) 0 else
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         val left = root.paddingLeft
         val top = root.paddingTop
         val right = root.paddingRight
