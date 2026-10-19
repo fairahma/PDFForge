@@ -90,7 +90,7 @@ class MainActivity : Activity() {
         )
         val grid = GridLayout(this).apply { columnCount = 2 }
         val width = (resources.displayMetrics.widthPixels - dp(52)) / 2
-        tools.forEach { (symbol, name, op) ->
+        tools.forEach { (_, name, op) ->
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -102,11 +102,7 @@ class MainActivity : Activity() {
                     startActivity(Intent(this@MainActivity, destination).putExtra("tool", if (op == "pages") "extract" else op))
                 }
             }
-            card.addView(TextView(this).apply {
-                text = symbol
-                textSize = 32f
-                setTextColor(blue)
-            })
+            card.addView(ToolIcon(this, op, blue), LinearLayout.LayoutParams(dp(36), dp(36)))
             card.addView(TextView(this).apply {
                 text = name
                 textSize = 16f
