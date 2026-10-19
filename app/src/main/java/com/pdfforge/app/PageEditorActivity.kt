@@ -62,7 +62,7 @@ class PageEditorActivity : Activity() {
             "merge" -> "Merge PDFs"
             "extract" -> "Split / Extract"
             else -> "Organize PDF"
-        }, 23f).apply { typeface = Typeface.DEFAULT_BOLD }
+        }, 23f).apply { typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
         header.setOnClickListener { finish() }
         outer.addView(header)
         outer.addView(label("Arrange pages • Hold to reorder • Tap for options", 12f, ThemePrefs.secondary(this)).apply { setPadding(0, dp(3), 0, dp(14)) })
@@ -176,6 +176,7 @@ class PageEditorActivity : Activity() {
         }
         outer.addView(save, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(10) })
         setContentView(outer)
+        SafeArea.apply(this, outer)
         pickFiles()
     }
     private fun pickFiles() {
@@ -273,7 +274,7 @@ class PageEditorActivity : Activity() {
     }
     private fun refresh() {
         grid.removeAllViews()
-        info.text = "${pages.size} PAGES  •  Long-press thumbnails to reorder"
+        info.text = "${pages.size} PAGES  •  Hold a page, then drag onto a highlighted thumbnail"
         save.isEnabled = pages.isNotEmpty()
         if (pages.isEmpty()) {
             pageTitle.text = "No pages selected"
@@ -285,7 +286,7 @@ class PageEditorActivity : Activity() {
             val tile = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(5), dp(5), dp(5), dp(7))
-                background = rounded(if (index == activePage) Color.rgb(65, 85, 147) else ThemePrefs.surface(this@PageEditorActivity), 10)
+                background = StudioStyle.surface(this@PageEditorActivity, 10, index == activePage)
             }
             val thumb = ImageView(this).apply {
                 scaleType = ImageView.ScaleType.FIT_CENTER
@@ -301,19 +302,64 @@ class PageEditorActivity : Activity() {
                 tile.startDragAndDrop(ClipData.newPlainText("page", index.toString()), View.DragShadowBuilder(tile), index, 0)
                 true
             }
-            tile.setOnDragListener { _, event ->
-                if (event.action == DragEvent.ACTION_DROP) {
-                    val from = event.localState as? Int ?: return@setOnDragListener true
-                    if (from in pages.indices && index in pages.indices && from != index) {
-                        val moved = pages.removeAt(from)
-                        pages.add(index, moved)
-                        activePage = index
-                        output = null
-                        refresh()
-                    }
-                }
-                true
+            val normalBackground = tile.background
+            val positionLabel = tile.getChildAt(1) as TextView
+            val insertion = View(this).apply {
+                setBackgroundColor(Color.rgb(117, 91, 255))
+                visibility = View.GONE
             }
+            fun showTarget(y: Float) {
+                val before = y < tile.height / 2f
+                tile.background = GradientDrawable().apply {
+                    setColor(if (ThemePrefs.dark(this@PageEditorActivity)) Color.rgb(43, 58, 98) else Color.rgb(231, 225, 255))
+                    cornerRadius = dp(10).toFloat()
+                    setStroke(dp(2), Color.rgb(117, 91, 255))
+                }
+                positionLabel.text = if (before) "↑ Insert before" else "↓ Insert after"
+                positionLabel.setTextColor(if (ThemePrefs.dark(this@PageEditorActivity)) Color.WHITE else Color.rgb(75, 53, 191))
+                insertion.visibility = View.VISIBLE
+                (insertion.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
+                    params.topMargin = if (before) 0 else dp(4)
+                    params.bottomMargin = if (before) dp(4) else 0
+                    insertion.layoutParams = params
+                }
+            }
+            fun clearTarget() {
+                tile.background = normalBackground
+                positionLabel.text = "${index + 1}  ⋮"
+                positionLabel.setTextColor(if (index == activePage) Color.WHITE else navy)
+                insertion.visibility = View.GONE
+            }
+            tile.setOnDragListener { _, event ->
+                when (event.action) {
+                    DragEvent.ACTION_DRAG_STARTED -> true
+                    DragEvent.ACTION_DRAG_ENTERED, DragEvent.ACTION_DRAG_LOCATION -> {
+                        if ((event.localState as? Int) != null) showTarget(event.y)
+                        true
+                    }
+                    DragEvent.ACTION_DRAG_EXITED, DragEvent.ACTION_DRAG_ENDED -> {
+                        clearTarget()
+                        true
+                    }
+                    DragEvent.ACTION_DROP -> {
+                        val from = event.localState as? Int
+                        if (from != null && from in pages.indices) {
+                            val before = event.y < tile.height / 2f
+                            val insertionIndex = index + if (before) 0 else 1
+                            val moved = pages.removeAt(from)
+                            val target = (insertionIndex - if (from < insertionIndex) 1 else 0).coerceIn(0, pages.size)
+                            pages.add(target, moved)
+                            activePage = target
+                            output = null
+                            refresh()
+                            info.text = "Moved page ${from + 1} to position ${target + 1}"
+                        }
+                        true
+                    }
+                    else -> true
+                }
+            }
+            grid.addView(insertion, LinearLayout.LayoutParams(-1, dp(4)).apply { bottomMargin = dp(3) })
             grid.addView(tile, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
             thread {
                 try {

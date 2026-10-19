@@ -45,6 +45,7 @@ class ToolActivity : Activity() {
     private lateinit var selectionTitle: TextView
     private lateinit var workspace: LinearLayout
     private var sourceBytes: Long = 0L
+    private var compressionResult: LinearLayout? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,11 +60,7 @@ class ToolActivity : Activity() {
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(28, 24, 28, 24)
-                background = GradientDrawable().apply {
-                    setColor(ThemePrefs.surface(this@ToolActivity))
-                    cornerRadius = 28f
-                    setStroke(1, Color.rgb(221, 229, 239))
-                }
+                background = StudioStyle.surface(this@ToolActivity)
                 setOnClickListener {
                     if (op == "merge" || op == "extract" || op == "organize") {
                         startActivity(Intent(this@ToolActivity, PageEditorActivity::class.java).putExtra("tool", op))
@@ -79,20 +76,16 @@ class ToolActivity : Activity() {
                 }
             }
             card.addView(TextView(this).apply { text = title; textSize = 19f; setTextColor(ThemePrefs.foreground(this@ToolActivity)) })
-            card.addView(TextView(this).apply { text = subtitle; textSize = 13f; setTextColor(Color.rgb(205, 219, 239)) })
+            card.addView(TextView(this).apply { text = subtitle; textSize = 13f; setTextColor(ThemePrefs.secondary(this@ToolActivity)) })
             return card
         }
         layout.addView(TextView(this).apply { text = "‹  " + when(operation) { "compress" -> "Compress PDF"; "pages" -> "Split / Extract"; else -> "Images to PDF" }; textSize = 26f; setTextColor(ThemePrefs.foreground(this@ToolActivity)); setPadding(0, 0, 0, 8); setOnClickListener { finish() } })
-        layout.addView(TextView(this).apply { text = "Private, offline document workspace"; textSize = 15f; setTextColor(Color.rgb(205, 219, 239)); setPadding(0, 0, 0, 22) })
+        layout.addView(TextView(this).apply { text = "Private, offline document workspace"; textSize = 15f; setTextColor(ThemePrefs.secondary(this@ToolActivity)); setPadding(0, 0, 0, 22) })
         
         workspace = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 20, 20, 20)
-            background = GradientDrawable().apply {
-                setColor(ThemePrefs.surface(this@ToolActivity))
-                cornerRadius = 28f
-                setStroke(1, Color.rgb(65, 83, 116))
-            }
+            background = StudioStyle.surface(this@ToolActivity)
         }
         selectionTitle = TextView(this).apply {
             text = if (operation == "compress") "1  SELECT PDF" else "YOUR WORKSPACE"
@@ -116,7 +109,7 @@ class ToolActivity : Activity() {
         runButton.setTextColor(Color.WHITE)
         layout.addView(runButton)
         pagesInput = EditText(this).apply {
-            setTextColor(Color.WHITE)
+            setTextColor(ThemePrefs.foreground(this@ToolActivity))
             setHintTextColor(Color.rgb(179, 194, 220))
             hint = "Pages to extract: e.g. 1,3-5 (blank = all)"
             inputType = android.text.InputType.TYPE_CLASS_TEXT
@@ -143,47 +136,87 @@ class ToolActivity : Activity() {
         layout.addView(pagesInput)
         if (operation == "compress") {
             layout.addView(TextView(this).apply {
-                text = "2  CHOOSE COMPRESSION"
-                textSize = 17f
-                setTextColor(Color.WHITE)
-                setPadding(0, 22, 0, 12)
+                text = "COMPRESSION QUALITY"
+                textSize = 13f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                letterSpacing = 0.08f
+                setTextColor(ThemePrefs.secondary(this@ToolActivity))
+                setPadding(0, 22, 0, 14)
             })
-            val choices = RadioGroup(this).apply {
-                orientation = RadioGroup.VERTICAL
-                setPadding(18, 14, 18, 14)
-                background = GradientDrawable().apply {
-                    setColor(Color.rgb(35, 53, 82))
-                    cornerRadius = 22f
+            val options = listOf(
+                Triple("Low", "Original quality", "Preserves selectable text"),
+                Triple("Medium", "Balanced", "Smaller files, good clarity"),
+                Triple("High", "Smallest size", "Strong image compression")
+            )
+            val selector = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            val cards = mutableListOf<LinearLayout>()
+            options.forEachIndexed { index, option ->
+                val card = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER
+                    setPadding(6, 18, 6, 18)
+                    isClickable = true
+                    isFocusable = true
+                }
+                val icon = TextView(this).apply {
+                    text = if (index == 0) "◯" else if (index == 1) "◉" else "◕"
+                    textSize = 25f
+                    gravity = Gravity.CENTER
+                    setTextColor(ThemePrefs.accent)
+                }
+                card.addView(icon)
+                card.addView(TextView(this).apply {
+                    text = option.first
+                    textSize = 15f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    gravity = Gravity.CENTER
+                    setTextColor(ThemePrefs.foreground(this@ToolActivity))
+                })
+                card.addView(TextView(this).apply {
+                    text = option.second
+                    textSize = 11f
+                    gravity = Gravity.CENTER
+                    setTextColor(ThemePrefs.secondary(this@ToolActivity))
+                })
+                card.contentDescription = "${option.first} compression. ${option.second}. ${option.third}"
+                cards.add(card)
+                selector.addView(card, LinearLayout.LayoutParams(0, -2, 1f).apply {
+                    if (index > 0) leftMargin = 8
+                })
+                card.setOnClickListener {
+                    compressionLevel = index
+                    cards.forEachIndexed { i, item ->
+                        item.background = GradientDrawable().apply {
+                            setColor(if (i == index) {
+                                if (ThemePrefs.dark(this@ToolActivity)) Color.rgb(48, 40, 91) else Color.rgb(239, 235, 255)
+                            } else ThemePrefs.surface(this@ToolActivity))
+                            cornerRadius = 18f
+                            setStroke(if (i == index) 3 else 1,
+                                if (i == index) ThemePrefs.accent else ThemePrefs.secondary(this@ToolActivity))
+                        }
+                    }
                 }
             }
-            val options = listOf(
-                "Low  •  Original quality and selectable text",
-                "Medium  •  Balanced size and clarity",
-                "High  •  Smaller file, lower image quality"
-            )
-            val choiceIds = mutableListOf<Int>()
-            options.forEachIndexed { index, title ->
-                choices.addView(RadioButton(this).apply {
-                    id = View.generateViewId().also { choiceIds.add(it) }
-                    text = title
-                    textSize = 15f
-                    setTextColor(Color.WHITE)
-                    buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(242, 90, 96))
-                    setPadding(8, 12, 8, 12)
-                    isChecked = index == 0
-
-                })
-            }
-            choices.setOnCheckedChangeListener { _, checkedId -> compressionLevel = choiceIds.indexOf(checkedId).coerceAtLeast(0) }
-            layout.addView(choices)
+            layout.addView(selector)
+            cards.first().performClick()
             layout.addView(TextView(this).apply {
                 text = "Medium and High may flatten pages and remove selectable text."
-                textSize = 13f
-                setTextColor(Color.rgb(205, 219, 239))
-                setPadding(0, 12, 0, 18)
+                textSize = 12f
+                setTextColor(ThemePrefs.secondary(this@ToolActivity))
+                setPadding(0, 16, 0, 18)
             })
             (runButton.parent as? ViewGroup)?.removeView(runButton)
-            layout.addView(runButton)
+            layout.addView(runButton, LinearLayout.LayoutParams(-1, 62))
+            compressionResult = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(22, 20, 22, 20)
+                background = GradientDrawable().apply {
+                    setColor(ThemePrefs.surface(this@ToolActivity))
+                    cornerRadius = 24f
+                }
+                visibility = View.GONE
+            }
+            layout.addView(compressionResult, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 20 })
         }
 
         status = TextView(this).apply { text = "Choose a PDF to begin."; textSize = 15f; setTextColor(Color.WHITE); setPadding(0, 22, 0, 16) }
@@ -200,9 +233,45 @@ class ToolActivity : Activity() {
                 startActivity(Intent(this@ToolActivity, PageEditorActivity::class.java).putExtra("tool", "extract"))
             }
         })
-        val scroll = ScrollView(this)
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(ThemePrefs.background(this@ToolActivity))
+            isFillViewport = true
+            clipToPadding = false
+        }
         scroll.addView(layout)
-        setContentView(scroll)
+        val screen = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(ThemePrefs.background(this@ToolActivity))
+        }
+        screen.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        if (operation == "compress") {
+            (runButton.parent as? ViewGroup)?.removeView(runButton)
+            val footer = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(StudioStyle.dp(this@ToolActivity, 16),
+                    StudioStyle.dp(this@ToolActivity, 10),
+                    StudioStyle.dp(this@ToolActivity, 16),
+                    StudioStyle.dp(this@ToolActivity, 10))
+                setBackgroundColor(ThemePrefs.background(this@ToolActivity))
+            }
+            runButton.text = "Compress PDF"
+            runButton.textSize = 16f
+            runButton.isAllCaps = false
+            runButton.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            runButton.background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.rgb(91, 73, 238), Color.rgb(117, 83, 250))
+            ).apply { cornerRadius = StudioStyle.dp(this@ToolActivity, 14).toFloat() }
+            footer.addView(runButton, LinearLayout.LayoutParams(-1, StudioStyle.dp(this, 54)))
+            screen.addView(footer)
+        }
+        window.statusBarColor = ThemePrefs.background(this)
+        window.navigationBarColor = ThemePrefs.background(this)
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = if (ThemePrefs.dark(this)) 0 else
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        setContentView(screen)
+        SafeArea.apply(this, screen)
         showSelectedFiles()
         chooseFiles()
     }
@@ -227,6 +296,7 @@ class ToolActivity : Activity() {
             selected = uris
             if (uris.isEmpty()) return
             if (operation == "compress") {
+                compressionResult?.visibility = View.GONE
                 sourceBytes = contentResolver.openAssetFileDescriptor(uris.first(), "r")?.use { it.length } ?: 0L
                 result = null
                 saveButton.visibility = android.view.View.GONE
@@ -254,7 +324,7 @@ class ToolActivity : Activity() {
             filesPanel.addView(TextView(this).apply {
                 text = "No files selected yet. Choose a tool above to add your documents."
                 textSize = 15f
-                setTextColor(Color.rgb(182, 200, 229))
+                setTextColor(ThemePrefs.secondary(this@ToolActivity))
                 setPadding(0, 12, 0, 20)
             })
             if (::runButton.isInitialized) runButton.isEnabled = false
@@ -271,10 +341,7 @@ class ToolActivity : Activity() {
             val tile = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(14, 14, 14, 14)
-                background = GradientDrawable().apply {
-                    setColor(Color.rgb(245, 248, 253))
-                    cornerRadius = 18f
-                }
+                background = StudioStyle.surface(this@ToolActivity, 12)
             }
             val heading = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
             heading.addView(TextView(this).apply {
@@ -286,14 +353,14 @@ class ToolActivity : Activity() {
             detail.addView(TextView(this).apply {
                 text = metadata.first
                 textSize = 15f
-                setTextColor(Color.rgb(30, 43, 63))
+                setTextColor(ThemePrefs.foreground(this@ToolActivity))
                 maxLines = 2
                 ellipsize = android.text.TextUtils.TruncateAt.END
             })
             detail.addView(TextView(this).apply {
                 text = if (metadata.second > 0) "${metadata.second / 1024} KB • Item ${index + 1}" else "Item ${index + 1}"
                 textSize = 12f
-                setTextColor(Color.GRAY)
+                setTextColor(ThemePrefs.secondary(this@ToolActivity))
             })
             heading.addView(detail, LinearLayout.LayoutParams(0, -2, 1f))
             tile.addView(heading)
@@ -404,6 +471,51 @@ class ToolActivity : Activity() {
         }
     }
 
+    private fun showCompressionResult(before: Long, after: Long) {
+        val panel = compressionResult ?: return
+        panel.removeAllViews()
+        panel.visibility = View.VISIBLE
+        val saved = (before - after).coerceAtLeast(0L)
+        val percent = if (before > 0L) (saved * 100.0 / before).toInt().coerceIn(0, 100) else 0
+        fun readable(bytes: Long): String =
+            if (bytes >= 1024L * 1024L) String.format(java.util.Locale.US, "%.2f MB", bytes / (1024.0 * 1024.0))
+            else String.format(java.util.Locale.US, "%.1f KB", bytes / 1024.0)
+        panel.addView(TextView(this).apply {
+            text = "COMPRESSION RESULT"
+            textSize = 13f
+            letterSpacing = 0.08f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(ThemePrefs.secondary(this@ToolActivity))
+        })
+        panel.addView(TextView(this).apply {
+            text = "${readable(before)}  →  ${readable(after)}"
+            textSize = 24f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(ThemePrefs.foreground(this@ToolActivity))
+            setPadding(0, 14, 0, 10)
+        })
+        val progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100
+            this.progress = percent
+            progressTintList = android.content.res.ColorStateList.valueOf(Color.rgb(40, 202, 159))
+            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(ThemePrefs.secondary(this@ToolActivity))
+        }
+        panel.addView(progress, LinearLayout.LayoutParams(-1, 14))
+        panel.addView(TextView(this).apply {
+            text = if (saved > 0) "$percent% smaller  •  Saved ${readable(saved)}"
+                   else "0% reduction  •  Original size retained"
+            textSize = 17f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(if (saved > 0) Color.rgb(40, 202, 159) else ThemePrefs.secondary(this@ToolActivity))
+            setPadding(0, 12, 0, 4)
+        })
+        panel.addView(TextView(this).apply {
+            text = if (saved == 0L) "This file could not be reduced without making it larger." else "Your compressed PDF is ready to save."
+            textSize = 12f
+            setTextColor(ThemePrefs.secondary(this@ToolActivity))
+        })
+    }
+
     private fun processFiles() {
         val uris = selected.toList()
         if (uris.isEmpty()) return
@@ -428,13 +540,14 @@ class ToolActivity : Activity() {
                     result = file
                     resultIsZip = zip
                     runOnUiThread {
+                        if (activeOperation == "compress") showCompressionResult(sourceBytes, file.length())
                         status.text = if (activeOperation == "compress") {
                             val before = sourceBytes
                             val after = file.length()
                             if (before > 0) {
                                 val percent = ((before - after).coerceAtLeast(0L) * 100.0 / before).toInt()
-                                "3  RESULT: Original ${before / 1024} KB, Result ${after / 1024} KB, Saved $percent%"
-                            } else "3  RESULT: ${after / 1024} KB"
+                                "Compression finished • Ready to preview or save"
+                            } else "Compression finished • Ready to save"
                         } else "Ready: ${file.length() / 1024} KB. Preview or save."
                         saveButton.isEnabled = true
                         previewButton.isEnabled = !zip
