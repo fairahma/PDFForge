@@ -63,8 +63,8 @@ class MainActivity : Activity() {
         })
         val tools = listOf(
             Triple("📑", "Merge PDFs", "merge"),
+            Triple("✂️", "Split / Extract", "pages"),
             Triple("🗂", "Organize", "organize"),
-            Triple("✂️", "Pages: Extract / Split", "pages"),
             Triple("🗜", "Compress", "compress"),
             Triple("🖼", "Images to PDF", "images")
         )
