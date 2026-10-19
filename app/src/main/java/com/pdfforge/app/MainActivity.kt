@@ -78,8 +78,8 @@ class MainActivity : Activity() {
                 background = shape(when(op) { "merge" -> Color.rgb(75, 52, 85); "pages" -> Color.rgb(36, 66, 100); "organize" -> Color.rgb(30, 79, 78); "compress" -> Color.rgb(94, 68, 43); else -> Color.rgb(75, 56, 106) }, 18)
                 elevation = dp(2).toFloat()
                 setOnClickListener {
-                    val destination = if (op == "merge" || op == "organize") PageEditorActivity::class.java else ToolActivity::class.java
-                    startActivity(Intent(this@MainActivity, destination).putExtra("tool", op))
+                    val destination = if (op == "merge" || op == "organize" || op == "pages") PageEditorActivity::class.java else ToolActivity::class.java
+                    startActivity(Intent(this@MainActivity, destination).putExtra("tool", if (op == "pages") "extract" else op))
                 }
             }
             card.addView(TextView(this).apply {
