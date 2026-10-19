@@ -21,13 +21,13 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         val dark = ThemePrefs.dark(this)
         val foreground = ThemePrefs.foreground(this)
-        val background = ThemePrefs.background(this)
-        window.statusBarColor = background
-        window.navigationBarColor = background
+        val screenBackground = ThemePrefs.background(this)
+        window.statusBarColor = screenBackground
+        window.navigationBarColor = screenBackground
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(16), dp(18), dp(20))
-            setBackgroundColor(background)
+            setBackgroundColor(screenBackground)
         }
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -147,7 +147,7 @@ class MainActivity : Activity() {
         })
         val scroll = ScrollView(this).apply {
             isFillViewport = true
-            setBackgroundColor(background)
+            setBackgroundColor(screenBackground)
             clipToPadding = false
         }
         scroll.addView(root)
