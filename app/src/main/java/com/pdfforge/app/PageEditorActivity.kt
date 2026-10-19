@@ -25,7 +25,11 @@ class PageEditorActivity : Activity() {
     private data class PageRef(val source: Int, val page: Int)
     private val sources = mutableListOf<File>()
     private val pages = mutableListOf<PageRef>()
-    private lateinit var grid: GridLayout
+    private lateinit var grid: LinearLayout
+    private lateinit var canvas: ImageView
+    private lateinit var pageTitle: TextView
+    private var activePage = 0
+    private var renderGeneration = 0
     private lateinit var info: TextView
     private lateinit var save: Button
     private var extractInput: EditText? = null
@@ -92,10 +96,58 @@ class PageEditorActivity : Activity() {
         info = label("Select a PDF to begin", 13f, Color.rgb(185, 201, 225))
         info.setPadding(0, dp(20), 0, dp(12))
         outer.addView(info)
-        val scroll = ScrollView(this)
-        grid = GridLayout(this).apply { columnCount = 2 }
-        scroll.addView(grid)
-        outer.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        val workspace = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val railScroll = ScrollView(this).apply { background = rounded(Color.rgb(23, 38, 65), 14) }
+        grid = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(5), dp(8), dp(5), dp(8))
+        }
+        railScroll.addView(grid)
+        workspace.addView(railScroll, LinearLayout.LayoutParams(dp(104), -1))
+        val viewer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(9), dp(8), dp(9), dp(8))
+        }
+        pageTitle = label("Select a page", 13f, Color.rgb(205, 221, 241)).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(4), 0, 0, dp(8))
+        }
+        viewer.addView(pageTitle)
+        val pageScroll = ScrollView(this).apply { fillViewport = true }
+        canvas = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            adjustViewBounds = true
+            setBackgroundColor(Color.WHITE)
+        }
+        pageScroll.addView(canvas, ScrollView.LayoutParams(-1, -2))
+        viewer.addView(pageScroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val remove = Button(this).apply {
+            text = "Delete"
+            isAllCaps = false
+            background = rounded(Color.rgb(77, 46, 67), 12)
+            setTextColor(Color.WHITE)
+            setOnClickListener {
+                if (pages.isNotEmpty()) {
+                    pages.removeAt(activePage.coerceIn(0, pages.lastIndex))
+                    activePage = activePage.coerceAtMost((pages.size - 1).coerceAtLeast(0))
+                    output = null
+                    refresh()
+                }
+            }
+        }
+        actions.addView(remove, LinearLayout.LayoutParams(0, dp(44), 1f))
+        val view = Button(this).apply {
+            text = "Full view"
+            isAllCaps = false
+            background = rounded(Color.rgb(42, 63, 99), 12)
+            setTextColor(Color.WHITE)
+            setOnClickListener { if (pages.isNotEmpty()) showSourcePage(pages[activePage]) }
+        }
+        actions.addView(view, LinearLayout.LayoutParams(0, dp(44), 1f).apply { leftMargin = dp(8) })
+        viewer.addView(actions)
+        workspace.addView(viewer, LinearLayout.LayoutParams(0, -1, 1f))
+        outer.addView(workspace, LinearLayout.LayoutParams(-1, 0, 1f))
         save = Button(this).apply {
             text = if (mode == "merge") "Review & save merged PDF" else "Review & save PDF"
             isAllCaps = false
@@ -167,56 +219,68 @@ class PageEditorActivity : Activity() {
     }
     private fun refresh() {
         grid.removeAllViews()
-        info.text = "${pages.size} pages  •  Hold to reorder"
+        info.text = "${pages.size} PAGES  •  Long-press thumbnails to reorder"
         save.isEnabled = pages.isNotEmpty()
-        val tileWidth = (resources.displayMetrics.widthPixels - dp(44)) / 2
+        if (pages.isEmpty()) {
+            pageTitle.text = "No pages selected"
+            canvas.setImageDrawable(null)
+            return
+        }
+        activePage = activePage.coerceIn(0, pages.lastIndex)
         pages.toList().forEachIndexed { index, ref ->
             val tile = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(dp(7), dp(7), dp(7), dp(9))
-                background = rounded(Color.rgb(33, 49, 75), 12)
-                elevation = dp(1).toFloat()
+                setPadding(dp(5), dp(5), dp(5), dp(7))
+                background = rounded(if (index == activePage) Color.rgb(65, 85, 147) else Color.rgb(33, 50, 80), 10)
             }
-            val image = ImageView(this).apply {
+            val thumb = ImageView(this).apply {
                 scaleType = ImageView.ScaleType.FIT_CENTER
                 setBackgroundColor(Color.WHITE)
             }
-            tile.addView(image, LinearLayout.LayoutParams(-1, dp(165)))
-            tile.addView(label("Page ${index + 1}   ·   ⋮", 12f, Color.rgb(205, 221, 241)).apply { setPadding(dp(5), dp(8), 0, 0) })
-            tile.setOnClickListener {
-                AlertDialog.Builder(this).setTitle("Page ${index + 1}")
-                    .setItems(arrayOf("View page", "Remove page")) { _, choice ->
-                        if (choice == 0) showSourcePage(ref)
-                        else { pages.removeAt(index); output = null; refresh() }
-                    }.show()
-            }
+            tile.addView(thumb, LinearLayout.LayoutParams(-1, dp(110)))
+            tile.addView(label("${index + 1}  ⋮", 12f, Color.WHITE).apply {
+                gravity = Gravity.CENTER
+                setPadding(0, dp(4), 0, 0)
+            })
+            tile.setOnClickListener { activePage = index; refresh() }
             tile.setOnLongClickListener {
-                val data = ClipData.newPlainText("page", index.toString())
-                tile.startDragAndDrop(data, View.DragShadowBuilder(tile), index, 0)
+                tile.startDragAndDrop(ClipData.newPlainText("page", index.toString()), View.DragShadowBuilder(tile), index, 0)
                 true
             }
             tile.setOnDragListener { _, event ->
                 if (event.action == DragEvent.ACTION_DROP) {
                     val from = event.localState as? Int ?: return@setOnDragListener true
                     if (from in pages.indices && index in pages.indices && from != index) {
-                        val item = pages.removeAt(from)
-                        pages.add(index, item)
+                        val moved = pages.removeAt(from)
+                        pages.add(index, moved)
+                        activePage = index
                         output = null
                         refresh()
                     }
                 }
                 true
             }
-            grid.addView(tile, GridLayout.LayoutParams().apply {
-                width = tileWidth - dp(8)
-                height = -2
-                setMargins(dp(4), dp(6), dp(4), dp(6))
-            })
+            grid.addView(tile, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
             thread {
                 try {
-                    val bitmap = renderPage(sources[ref.source], ref.page, 300)
-                    runOnUiThread { if (tile.parent != null) image.setImageBitmap(bitmap) else bitmap.recycle() }
+                    val bitmap = renderPage(sources[ref.source], ref.page, 150)
+                    runOnUiThread { if (tile.parent != null) thumb.setImageBitmap(bitmap) else bitmap.recycle() }
                 } catch (_: Exception) { }
+            }
+        }
+        pageTitle.text = "Page ${activePage + 1} of ${pages.size}"
+        val ref = pages[activePage]
+        val generation = ++renderGeneration
+        canvas.setImageDrawable(null)
+        thread {
+            try {
+                val bitmap = renderPage(sources[ref.source], ref.page, 750)
+                runOnUiThread {
+                    if (generation == renderGeneration) canvas.setImageBitmap(bitmap)
+                    else bitmap.recycle()
+                }
+            } catch (e: Exception) {
+                runOnUiThread { if (generation == renderGeneration) pageTitle.text = "Unable to render page" }
             }
         }
     }
