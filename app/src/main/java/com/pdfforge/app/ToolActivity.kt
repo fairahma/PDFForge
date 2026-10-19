@@ -43,6 +43,7 @@ class ToolActivity : Activity() {
     private lateinit var runButton: Button
     private lateinit var selectionTitle: TextView
     private lateinit var workspace: LinearLayout
+    private var sourceBytes: Long = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,9 +81,9 @@ class ToolActivity : Activity() {
             card.addView(TextView(this).apply { text = subtitle; textSize = 13f; setTextColor(Color.rgb(205, 219, 239)) })
             return card
         }
-        layout.addView(TextView(this).apply { text = "PDFForge"; textSize = 34f; setTextColor(Color.rgb(23, 60, 103)); setPadding(0, 0, 0, 8) })
-        layout.addView(TextView(this).apply { text = "Your private PDF workspace • Offline"; textSize = 15f; setPadding(0, 0, 0, 22) })
-        layout.addView(TextView(this).apply { text = when(operation) { "images" -> "Images to PDF"; "pages" -> "Extract or Split Pages"; "split" -> "Split PDF"; else -> "Compress PDF" }; textSize = 25f; setTextColor(Color.rgb(23, 60, 103)); setPadding(0, 0, 0, 12) })
+        layout.addView(TextView(this).apply { text = "PDFForge"; textSize = 34f; setTextColor(Color.WHITE); setPadding(0, 0, 0, 8) })
+        layout.addView(TextView(this).apply { text = "Your private PDF workspace • Offline"; textSize = 15f; setTextColor(Color.rgb(205, 219, 239)); setPadding(0, 0, 0, 22) })
+        layout.addView(TextView(this).apply { text = when(operation) { "images" -> "Images to PDF"; "pages" -> "Extract or Split Pages"; "split" -> "Split PDF"; else -> "Compress PDF" }; textSize = 25f; setTextColor(Color.WHITE); setPadding(0, 0, 0, 12) })
         workspace = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 20, 20, 20)
@@ -93,7 +94,7 @@ class ToolActivity : Activity() {
             }
         }
         selectionTitle = TextView(this).apply {
-            text = "YOUR WORKSPACE"
+            text = if (operation == "compress") "1  SELECT PDF" else "YOUR WORKSPACE"
             textSize = 18f
             setTextColor(Color.rgb(23, 60, 103))
             setPadding(0, 0, 0, 12)
@@ -102,12 +103,12 @@ class ToolActivity : Activity() {
         filesPanel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         workspace.addView(filesPanel)
         workspace.addView(Button(this).apply {
-            text = "+ Add / change files"
+            text = if (operation == "compress") "Choose / change PDF" else "+ Add / change files"
             isAllCaps = false
             setOnClickListener { if (operation.isNotEmpty()) chooseFiles() else status.text = "Choose a tool above first." }
         })
         layout.addView(workspace, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 14; bottomMargin = 12 })
-        runButton = Button(this).apply { text = if (operation == "split") "Split into folder" else "Create PDF"; isEnabled = false; setOnClickListener { if (operation == "split" || (operation == "pages" && splitMode)) chooseSplitFolder() else processFiles() } }
+        runButton = Button(this).apply { text = if (operation == "compress") "Compress PDF" else if (operation == "split") "Split into folder" else "Create PDF"; isEnabled = false; setOnClickListener { if (operation == "split" || (operation == "pages" && splitMode)) chooseSplitFolder() else processFiles() } }
         runButton.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(242, 90, 96))
         runButton.setTextColor(Color.WHITE)
         layout.addView(runButton)
@@ -136,22 +137,56 @@ class ToolActivity : Activity() {
         }
         layout.addView(pagesInput)
         if (operation == "compress") {
-            val levels = Spinner(this)
-            levels.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, listOf("Low - lossless", "Medium - balanced", "High - smallest"))
-            levels.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-                override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
-                override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) { compressionLevel = position }
+            layout.addView(TextView(this).apply {
+                text = "2  CHOOSE COMPRESSION"
+                textSize = 17f
+                setTextColor(Color.WHITE)
+                setPadding(0, 22, 0, 12)
+            })
+            val choices = RadioGroup(this).apply {
+                orientation = RadioGroup.VERTICAL
+                setPadding(18, 14, 18, 14)
+                background = GradientDrawable().apply {
+                    setColor(Color.rgb(35, 53, 82))
+                    cornerRadius = 22f
+                }
             }
-            layout.addView(levels)
-            layout.addView(TextView(this).apply { text = "Medium and High flatten pages; selectable text may be lost."; setTextColor(Color.WHITE) })
+            val options = listOf(
+                "Low  •  Original quality and selectable text",
+                "Medium  •  Balanced size and clarity",
+                "High  •  Smaller file, lower image quality"
+            )
+            options.forEachIndexed { index, title ->
+                choices.addView(RadioButton(this).apply {
+                    id = View.generateViewId()
+                    text = title
+                    textSize = 15f
+                    setTextColor(Color.WHITE)
+                    buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(242, 90, 96))
+                    setPadding(8, 12, 8, 12)
+                    isChecked = index == 0
+                    setOnClickListener { compressionLevel = index }
+                })
+            }
+            layout.addView(choices)
+            layout.addView(TextView(this).apply {
+                text = "Medium and High may flatten pages and remove selectable text."
+                textSize = 13f
+                setTextColor(Color.rgb(205, 219, 239))
+                setPadding(0, 12, 0, 18)
+            })
+            (runButton.parent as? ViewGroup)?.removeView(runButton)
+            layout.addView(runButton)
         }
 
-        status = TextView(this).apply { text = "Choose a tool to begin."; textSize = 15f; setPadding(0, 30, 0, 16) }
+        status = TextView(this).apply { text = "Choose a PDF to begin."; textSize = 15f; setTextColor(Color.WHITE); setPadding(0, 22, 0, 16) }
         layout.addView(status)
         saveButton = Button(this).apply { text = "Save result"; isEnabled = false; setOnClickListener { saveResult() } }
         layout.addView(saveButton)
+        if (operation == "compress") saveButton.visibility = android.view.View.GONE
         previewButton = Button(this).apply { text = "Preview PDF result"; isEnabled = false; setOnClickListener { result?.let { preview(it) } } }
         layout.addView(previewButton)
+        if (operation == "compress") previewButton.visibility = android.view.View.GONE
         if (operation == "pages") layout.addView(Button(this).apply {
             text = "Visual page selection and organization"
             setOnClickListener {
@@ -184,9 +219,15 @@ class ToolActivity : Activity() {
             data.data?.let { if (!uris.contains(it)) uris.add(it) }
             selected = uris
             if (uris.isEmpty()) return
+            if (operation == "compress") {
+                sourceBytes = contentResolver.openAssetFileDescriptor(uris.first(), "r")?.use { it.length } ?: 0L
+                result = null
+                saveButton.visibility = android.view.View.GONE
+                previewButton.visibility = android.view.View.GONE
+            }
             showSelectedFiles()
             runButton.isEnabled = true
-            status.text = "Review files and tap Process selected files."
+            status.text = if (operation == "compress") "Ready. Select a compression level and tap Compress PDF." else "Review files and tap Process selected files."
         } else if (requestCode == splitFolderCode) {
             val folder = data.data ?: return
             splitIntoFolder(folder)
@@ -284,6 +325,7 @@ class ToolActivity : Activity() {
                 isAllCaps = false
                 setOnClickListener {
                     selected = selected.filterIndexed { i, _ -> i != index }
+                    if (operation == "compress") { result = null; saveButton.visibility = android.view.View.GONE; previewButton.visibility = android.view.View.GONE }
                     showSelectedFiles()
                 }
             })
