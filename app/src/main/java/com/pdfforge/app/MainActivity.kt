@@ -17,12 +17,12 @@ class MainActivity : Activity() {
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val navy = Color.WHITE
+        val navy = ThemePrefs.foreground(this)
         val blue = Color.rgb(117, 91, 255)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(26), dp(18), dp(24))
-            setBackgroundColor(Color.rgb(16, 29, 53))
+            setBackgroundColor(ThemePrefs.background(this@MainActivity))
         }
         root.addView(TextView(this).apply {
             text = "PDFForge"
@@ -30,10 +30,30 @@ class MainActivity : Activity() {
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(navy)
         })
+        val settings = TextView(this).apply {
+            text = "⚙  Appearance"
+            textSize = 14f
+            gravity = Gravity.END
+            setTextColor(ThemePrefs.accent)
+            setPadding(0, 0, 0, dp(10))
+            setOnClickListener {
+                val modes = arrayOf("Follow system", "Light", "Dark")
+                val values = arrayOf("system", "light", "dark")
+                val current = values.indexOf(ThemePrefs.mode(this@MainActivity)).coerceAtLeast(0)
+                android.app.AlertDialog.Builder(this@MainActivity)
+                    .setTitle("App appearance")
+                    .setSingleChoiceItems(modes, current) { dialog, index ->
+                        ThemePrefs.set(this@MainActivity, values[index])
+                        dialog.dismiss()
+                        recreate()
+                    }.setNegativeButton("Cancel", null).show()
+            }
+        }
+        root.addView(settings)
         root.addView(TextView(this).apply {
             text = "Your PDF studio • Private & offline"
             textSize = 15f
-            setTextColor(Color.rgb(182, 200, 229))
+            setTextColor(ThemePrefs.secondary(this@MainActivity))
             setPadding(0, dp(5), 0, dp(22))
         })
         val hero = LinearLayout(this).apply {
@@ -75,7 +95,7 @@ class MainActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(17), dp(18), dp(12), dp(18))
-                background = shape(when(op) { "merge" -> Color.rgb(75, 52, 85); "pages" -> Color.rgb(36, 66, 100); "organize" -> Color.rgb(30, 79, 78); "compress" -> Color.rgb(94, 68, 43); else -> Color.rgb(75, 56, 106) }, 18)
+                background = shape(if (ThemePrefs.dark(this@MainActivity)) when(op) { "merge" -> Color.rgb(75, 52, 85); "pages" -> Color.rgb(36, 66, 100); "organize" -> Color.rgb(30, 79, 78); "compress" -> Color.rgb(94, 68, 43); else -> Color.rgb(75, 56, 106) } else when(op) { "merge" -> Color.rgb(255, 225, 230); "pages" -> Color.rgb(217, 238, 255); "organize" -> Color.rgb(215, 249, 237); "compress" -> Color.rgb(255, 239, 203); else -> Color.rgb(237, 224, 255) }, 18)
                 elevation = dp(2).toFloat()
                 setOnClickListener {
                     val destination = if (op == "merge" || op == "organize" || op == "pages") PageEditorActivity::class.java else ToolActivity::class.java
@@ -91,10 +111,10 @@ class MainActivity : Activity() {
                 text = name
                 textSize = 16f
                 typeface = Typeface.DEFAULT_BOLD
-                setTextColor(Color.WHITE)
+                setTextColor(ThemePrefs.foreground(this@MainActivity))
                 setPadding(0, dp(12), 0, 0)
             })
-            card.addView(TextView(this).apply { text = when(op) { "merge" -> "Combine documents"; "pages" -> "Select or split pages"; "organize" -> "Reorder and remove"; "compress" -> "Reduce file size"; else -> "Convert photos" }; textSize = 11f; setTextColor(Color.rgb(220, 228, 245)); setPadding(0, dp(6), 0, 0) })
+            card.addView(TextView(this).apply { text = when(op) { "merge" -> "Combine documents"; "pages" -> "Select or split pages"; "organize" -> "Reorder and remove"; "compress" -> "Reduce file size"; else -> "Convert photos" }; textSize = 11f; setTextColor(ThemePrefs.secondary(this@MainActivity)); setPadding(0, dp(6), 0, 0) })
             grid.addView(card, GridLayout.LayoutParams().apply {
                 this.width = width - dp(8)
                 height = dp(148)
