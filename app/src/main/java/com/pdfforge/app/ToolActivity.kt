@@ -277,6 +277,7 @@ class ToolActivity : Activity() {
             selected = uris
             if (uris.isEmpty()) return
             if (operation == "compress") {
+                compressionResult?.visibility = View.GONE
                 sourceBytes = contentResolver.openAssetFileDescriptor(uris.first(), "r")?.use { it.length } ?: 0L
                 result = null
                 saveButton.visibility = android.view.View.GONE
@@ -454,6 +455,51 @@ class ToolActivity : Activity() {
         }
     }
 
+    private fun showCompressionResult(before: Long, after: Long) {
+        val panel = compressionResult ?: return
+        panel.removeAllViews()
+        panel.visibility = View.VISIBLE
+        val saved = (before - after).coerceAtLeast(0L)
+        val percent = if (before > 0L) (saved * 100.0 / before).toInt().coerceIn(0, 100) else 0
+        fun readable(bytes: Long): String =
+            if (bytes >= 1024L * 1024L) String.format(java.util.Locale.US, "%.2f MB", bytes / (1024.0 * 1024.0))
+            else String.format(java.util.Locale.US, "%.1f KB", bytes / 1024.0)
+        panel.addView(TextView(this).apply {
+            text = "COMPRESSION RESULT"
+            textSize = 13f
+            letterSpacing = 0.08f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(ThemePrefs.secondary(this@ToolActivity))
+        })
+        panel.addView(TextView(this).apply {
+            text = "${readable(before)}  →  ${readable(after)}"
+            textSize = 24f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(ThemePrefs.foreground(this@ToolActivity))
+            setPadding(0, 14, 0, 10)
+        })
+        val progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100
+            this.progress = percent
+            progressTintList = android.content.res.ColorStateList.valueOf(Color.rgb(40, 202, 159))
+            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(ThemePrefs.secondary(this@ToolActivity))
+        }
+        panel.addView(progress, LinearLayout.LayoutParams(-1, 14))
+        panel.addView(TextView(this).apply {
+            text = if (saved > 0) "$percent% smaller  •  Saved ${readable(saved)}"
+                   else "0% reduction  •  Original size retained"
+            textSize = 17f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(if (saved > 0) Color.rgb(40, 202, 159) else ThemePrefs.secondary(this@ToolActivity))
+            setPadding(0, 12, 0, 4)
+        })
+        panel.addView(TextView(this).apply {
+            text = if (saved == 0L) "This file could not be reduced without making it larger." else "Your compressed PDF is ready to save."
+            textSize = 12f
+            setTextColor(ThemePrefs.secondary(this@ToolActivity))
+        })
+    }
+
     private fun processFiles() {
         val uris = selected.toList()
         if (uris.isEmpty()) return
@@ -478,13 +524,14 @@ class ToolActivity : Activity() {
                     result = file
                     resultIsZip = zip
                     runOnUiThread {
+                        if (activeOperation == "compress") showCompressionResult(sourceBytes, file.length())
                         status.text = if (activeOperation == "compress") {
                             val before = sourceBytes
                             val after = file.length()
                             if (before > 0) {
                                 val percent = ((before - after).coerceAtLeast(0L) * 100.0 / before).toInt()
-                                "3  RESULT: Original ${before / 1024} KB, Result ${after / 1024} KB, Saved $percent%"
-                            } else "3  RESULT: ${after / 1024} KB"
+                                "Compression finished • Ready to preview or save"
+                            } else "Compression finished • Ready to save"
                         } else "Ready: ${file.length() / 1024} KB. Preview or save."
                         saveButton.isEnabled = true
                         previewButton.isEnabled = !zip
