@@ -14,6 +14,7 @@ import android.os.ParcelFileDescriptor
 import android.view.Gravity
 import android.graphics.drawable.GradientDrawable
 import android.provider.OpenableColumns
+import android.view.View
 import android.view.ViewGroup
 import android.widget.*
 import java.io.File
@@ -422,10 +423,19 @@ class ToolActivity : Activity() {
                     resultIsZip = zip
                     runOnUiThread {
                         status.text = if (activeOperation == "compress") {
-                            "Finished: ${file.length() / 1024} KB. Original text and image quality preserved. Some PDFs cannot be reduced without quality loss."
+                            val before = sourceBytes
+                            val after = file.length()
+                            if (before > 0) {
+                                val percent = ((before - after).coerceAtLeast(0L) * 100.0 / before).toInt()
+                                "3  RESULT: Original ${before / 1024} KB, Result ${after / 1024} KB, Saved $percent%"
+                            } else "3  RESULT: ${after / 1024} KB"
                         } else "Ready: ${file.length() / 1024} KB. Preview or save."
                         saveButton.isEnabled = true
                         previewButton.isEnabled = !zip
+                        if (activeOperation == "compress") {
+                            saveButton.visibility = View.VISIBLE
+                            previewButton.visibility = View.VISIBLE
+                        }
                         runButton.isEnabled = true
                     }
                 } catch (e: Exception) {
