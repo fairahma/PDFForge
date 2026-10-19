@@ -37,7 +37,7 @@ class PageEditorActivity : Activity() {
     private var mode = "organize"
     private val pickRequest = 201
     private val saveRequest = 202
-    private val navy = Color.rgb(235, 242, 255)
+    private val navy get() = ThemePrefs.foreground(this)
     private val blue = Color.rgb(242, 90, 96)
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun rounded(color: Int, radius: Int = 16) = GradientDrawable().apply {
@@ -52,7 +52,7 @@ class PageEditorActivity : Activity() {
         title = "PDFForge"
         val outer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(16, 29, 53))
+            setBackgroundColor(ThemePrefs.background(this@PageEditorActivity))
             setPadding(dp(16), dp(18), dp(16), dp(10))
         }
         val header = label("‹  " + when(mode) {
@@ -62,7 +62,7 @@ class PageEditorActivity : Activity() {
         }, 23f).apply { typeface = Typeface.DEFAULT_BOLD }
         header.setOnClickListener { finish() }
         outer.addView(header)
-        outer.addView(label("Arrange pages • Hold to reorder • Tap for options", 12f, Color.rgb(182, 200, 229)).apply { setPadding(0, dp(3), 0, dp(14)) })
+        outer.addView(label("Arrange pages • Hold to reorder • Tap for options", 12f, ThemePrefs.secondary(this)).apply { setPadding(0, dp(3), 0, dp(14)) })
         val toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(5), 0, dp(5)) }
         val add = Button(this).apply {
             text = "+  Add files"
@@ -93,11 +93,11 @@ class PageEditorActivity : Activity() {
             }
             outer.addView(extractInput)
         }
-        info = label("Select a PDF to begin", 13f, Color.rgb(185, 201, 225))
+        info = label("Select a PDF to begin", 13f, ThemePrefs.secondary(this))
         info.setPadding(0, dp(20), 0, dp(12))
         outer.addView(info)
         val workspace = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val railScroll = ScrollView(this).apply { background = rounded(Color.rgb(23, 38, 65), 14) }
+        val railScroll = ScrollView(this).apply { background = rounded(ThemePrefs.surface(this), 14) }
         grid = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(5), dp(8), dp(5), dp(8))
@@ -108,7 +108,7 @@ class PageEditorActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(9), dp(8), dp(9), dp(8))
         }
-        pageTitle = label("Select a page", 13f, Color.rgb(205, 221, 241)).apply {
+        pageTitle = label("Select a page", 13f, ThemePrefs.secondary(this)).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(4), 0, 0, dp(8))
         }
@@ -231,7 +231,7 @@ class PageEditorActivity : Activity() {
             val tile = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(5), dp(5), dp(5), dp(7))
-                background = rounded(if (index == activePage) Color.rgb(65, 85, 147) else Color.rgb(33, 50, 80), 10)
+                background = rounded(if (index == activePage) Color.rgb(65, 85, 147) else ThemePrefs.surface(this), 10)
             }
             val thumb = ImageView(this).apply {
                 scaleType = ImageView.ScaleType.FIT_CENTER
