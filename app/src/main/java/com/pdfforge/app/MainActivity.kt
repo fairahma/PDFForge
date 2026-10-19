@@ -102,7 +102,18 @@ class MainActivity : Activity() {
                     startActivity(Intent(this@MainActivity, destination).putExtra("tool", if (op == "pages") "extract" else op))
                 }
             }
-            card.addView(ToolIcon(this, op, if (ThemePrefs.dark(this@MainActivity)) Color.rgb(139, 216, 203) else Color.rgb(38, 119, 113)), LinearLayout.LayoutParams(dp(36), dp(36)))
+            val iconId = when(op) {
+                "merge" -> R.drawable.ic_merge_pdf
+                "pages" -> R.drawable.ic_split_pdf
+                "organize" -> R.drawable.ic_organize_pdf
+                "compress" -> R.drawable.ic_compress_pdf
+                else -> R.drawable.ic_image_to_pdf
+            }
+            card.addView(ImageView(this).apply {
+                setImageResource(iconId)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                contentDescription = "$name icon"
+            }, LinearLayout.LayoutParams(dp(62), dp(62)))
             card.addView(TextView(this).apply {
                 text = name
                 textSize = 15f
