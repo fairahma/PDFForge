@@ -53,14 +53,14 @@ class ToolActivity : Activity() {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(22, 26, 22, 24)
-            setBackgroundColor(Color.rgb(16, 29, 53))
+            setBackgroundColor(ThemePrefs.background(this@ToolActivity))
         }
         fun card(title: String, subtitle: String, op: String): LinearLayout {
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(28, 24, 28, 24)
                 background = GradientDrawable().apply {
-                    setColor(Color.rgb(35, 53, 82))
+                    setColor(ThemePrefs.surface(this@ToolActivity))
                     cornerRadius = 28f
                     setStroke(1, Color.rgb(221, 229, 239))
                 }
@@ -78,18 +78,18 @@ class ToolActivity : Activity() {
                     chooseFiles()
                 }
             }
-            card.addView(TextView(this).apply { text = title; textSize = 19f; setTextColor(Color.rgb(235, 242, 255)) })
+            card.addView(TextView(this).apply { text = title; textSize = 19f; setTextColor(ThemePrefs.foreground(this@ToolActivity)) })
             card.addView(TextView(this).apply { text = subtitle; textSize = 13f; setTextColor(Color.rgb(205, 219, 239)) })
             return card
         }
-        layout.addView(TextView(this).apply { text = "‹  " + when(operation) { "compress" -> "Compress PDF"; "pages" -> "Split / Extract"; else -> "Images to PDF" }; textSize = 26f; setTextColor(Color.WHITE); setPadding(0, 0, 0, 8); setOnClickListener { finish() } })
+        layout.addView(TextView(this).apply { text = "‹  " + when(operation) { "compress" -> "Compress PDF"; "pages" -> "Split / Extract"; else -> "Images to PDF" }; textSize = 26f; setTextColor(ThemePrefs.foreground(this@ToolActivity)); setPadding(0, 0, 0, 8); setOnClickListener { finish() } })
         layout.addView(TextView(this).apply { text = "Private, offline document workspace"; textSize = 15f; setTextColor(Color.rgb(205, 219, 239)); setPadding(0, 0, 0, 22) })
         
         workspace = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 20, 20, 20)
             background = GradientDrawable().apply {
-                setColor(Color.rgb(29, 47, 77))
+                setColor(ThemePrefs.surface(this@ToolActivity))
                 cornerRadius = 28f
                 setStroke(1, Color.rgb(65, 83, 116))
             }
@@ -97,7 +97,7 @@ class ToolActivity : Activity() {
         selectionTitle = TextView(this).apply {
             text = if (operation == "compress") "1  SELECT PDF" else "YOUR WORKSPACE"
             textSize = 18f
-            setTextColor(Color.WHITE)
+            setTextColor(ThemePrefs.foreground(this@ToolActivity))
             setPadding(0, 0, 0, 12)
         }
         workspace.addView(selectionTitle)
