@@ -82,7 +82,7 @@ class PageEditorActivity : Activity() {
         preview.setTextColor(Color.WHITE)
         outer.addView(toolbar)
         if (mode == "extract") {
-            outer.addView(label("Pages to extract (e.g. 1,3,5-8)", 14f))
+            outer.addView(label("Extract selected pages", 14f))
             extractInput = EditText(this).apply {
                 hint = "1,3,5-8  •  Blank = all pages"
                 setSingleLine(true)
@@ -149,7 +149,7 @@ class PageEditorActivity : Activity() {
         workspace.addView(viewer, LinearLayout.LayoutParams(0, -1, 1f))
         outer.addView(workspace, LinearLayout.LayoutParams(-1, 0, 1f))
         save = Button(this).apply {
-            text = if (mode == "merge") "Review & save merged PDF" else "Review & save PDF"
+            text = if (mode == "merge") "Review & save merged PDF" else if (mode == "extract") "Extract selected pages" else "Review & save PDF"
             isAllCaps = false
             setTextColor(Color.WHITE)
             background = rounded(blue, 14)
