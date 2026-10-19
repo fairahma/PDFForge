@@ -176,6 +176,7 @@ class PageEditorActivity : Activity() {
         }
         outer.addView(save, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(10) })
         setContentView(outer)
+        SafeArea.apply(this, outer)
         pickFiles()
     }
     private fun pickFiles() {
