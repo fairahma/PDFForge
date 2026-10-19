@@ -61,7 +61,7 @@ class PageEditorActivity : Activity() {
         outer.addView(label("Arrange pages • Hold to reorder • Tap for options", 12f, Color.rgb(182, 200, 229)).apply { setPadding(0, dp(3), 0, dp(14)) })
         val toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(5), 0, dp(5)) }
         val add = Button(this).apply {
-            text = "+ Add PDF"
+            text = "+  Add files"
             isAllCaps = false
             setOnClickListener { pickFiles() }
         }
@@ -72,9 +72,9 @@ class PageEditorActivity : Activity() {
             setOnClickListener { buildResult(true) }
         }
         toolbar.addView(preview, LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(6) })
-        add.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(65, 92, 137))
+        add.background = rounded(Color.rgb(41, 63, 98), 12)
         add.setTextColor(Color.WHITE)
-        preview.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(65, 92, 137))
+        preview.background = rounded(Color.rgb(41, 63, 98), 12)
         preview.setTextColor(Color.WHITE)
         outer.addView(toolbar)
         if (mode == "extract") {
@@ -89,7 +89,7 @@ class PageEditorActivity : Activity() {
             }
             outer.addView(extractInput)
         }
-        info = label("Choose a PDF to start editing.", 14f)
+        info = label("Select a PDF to begin", 13f, Color.rgb(185, 201, 225))
         info.setPadding(0, dp(20), 0, dp(12))
         outer.addView(info)
         val scroll = ScrollView(this)
@@ -169,7 +169,7 @@ class PageEditorActivity : Activity() {
         grid.removeAllViews()
         info.text = "${pages.size} pages  •  Hold to reorder"
         save.isEnabled = pages.isNotEmpty()
-        val tileWidth = (resources.displayMetrics.widthPixels - dp(48)) / 2
+        val tileWidth = (resources.displayMetrics.widthPixels - dp(44)) / 2
         pages.toList().forEachIndexed { index, ref ->
             val tile = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
@@ -179,7 +179,7 @@ class PageEditorActivity : Activity() {
             }
             val image = ImageView(this).apply {
                 scaleType = ImageView.ScaleType.FIT_CENTER
-                setBackgroundColor(Color.rgb(225, 233, 246))
+                setBackgroundColor(Color.WHITE)
             }
             tile.addView(image, LinearLayout.LayoutParams(-1, dp(165)))
             tile.addView(label("Page ${index + 1}   ·   ⋮", 12f, Color.rgb(205, 221, 241)).apply { setPadding(dp(5), dp(8), 0, 0) })
