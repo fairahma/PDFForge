@@ -37,6 +37,9 @@ class PageEditorActivity : Activity() {
     private var mode = "organize"
     private val pickRequest = 201
     private val saveRequest = 202
+    private val folderRequest = 203
+    private var splitMode = false
+    private var splitCuts = emptyList<Int>()
     private val navy get() = ThemePrefs.foreground(this)
     private val blue = Color.rgb(242, 90, 96)
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
@@ -82,7 +85,22 @@ class PageEditorActivity : Activity() {
         preview.setTextColor(Color.WHITE)
         outer.addView(toolbar)
         if (mode == "extract") {
-            outer.addView(label("Extract selected pages", 14f))
+            val switcher = RadioGroup(this).apply { orientation = RadioGroup.HORIZONTAL }
+            val extractRadio = RadioButton(this).apply {
+                id = View.generateViewId(); text = "Extract"; setTextColor(navy); isChecked = true
+            }
+            val splitRadio = RadioButton(this).apply {
+                id = View.generateViewId(); text = "Split"; setTextColor(navy)
+            }
+            switcher.addView(extractRadio)
+            switcher.addView(splitRadio)
+            outer.addView(switcher)
+            switcher.setOnCheckedChangeListener { _, checked ->
+                splitMode = checked == splitRadio.id
+                extractInput?.hint = if (splitMode) "Split after page numbers: 3,7" else "Extract: 1,3,5-8"
+                if (::save.isInitialized) save.text = if (splitMode) "Save split PDFs" else "Extract selected pages"
+            }
+            outer.addView(label("Page selection", 13f))
             extractInput = EditText(this).apply {
                 hint = "1,3,5-8  •  Blank = all pages"
                 setSingleLine(true)
@@ -154,7 +172,7 @@ class PageEditorActivity : Activity() {
             setTextColor(Color.WHITE)
             background = rounded(blue, 14)
             isEnabled = false
-            setOnClickListener { buildResult(true) }
+            setOnClickListener { if (mode == "extract" && splitMode) saveSplit() else buildResult(true) }
         }
         outer.addView(save, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(10) })
         setContentView(outer)
