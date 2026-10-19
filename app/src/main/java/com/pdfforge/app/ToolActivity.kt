@@ -36,6 +36,7 @@ class ToolActivity : Activity() {
     private lateinit var saveButton: Button
     private lateinit var previewButton: Button
     private lateinit var pagesInput: EditText
+    private var splitMode = false
     private var resultIsZip = false
     private lateinit var filesPanel: LinearLayout
     private lateinit var runButton: Button
@@ -80,7 +81,7 @@ class ToolActivity : Activity() {
         }
         layout.addView(TextView(this).apply { text = "PDFForge"; textSize = 34f; setTextColor(Color.rgb(23, 60, 103)); setPadding(0, 0, 0, 8) })
         layout.addView(TextView(this).apply { text = "Your private PDF workspace • Offline"; textSize = 15f; setPadding(0, 0, 0, 22) })
-        layout.addView(TextView(this).apply { text = when(operation) { "images" -> "Images to PDF"; "split" -> "Split PDF"; else -> "Compress PDF" }; textSize = 25f; setTextColor(Color.rgb(23, 60, 103)); setPadding(0, 0, 0, 12) })
+        layout.addView(TextView(this).apply { text = when(operation) { "images" -> "Images to PDF"; "pages" -> "Extract or Split Pages"; "split" -> "Split PDF"; else -> "Compress PDF" }; textSize = 25f; setTextColor(Color.rgb(23, 60, 103)); setPadding(0, 0, 0, 12) })
         workspace = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 20, 20, 20)
@@ -105,7 +106,7 @@ class ToolActivity : Activity() {
             setOnClickListener { if (operation.isNotEmpty()) chooseFiles() else status.text = "Choose a tool above first." }
         })
         layout.addView(workspace, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 14; bottomMargin = 12 })
-        runButton = Button(this).apply { text = if (operation == "split") "Split into folder" else "Create PDF"; isEnabled = false; setOnClickListener { if (operation == "split") chooseSplitFolder() else processFiles() } }
+        runButton = Button(this).apply { text = if (operation == "split") "Split into folder" else "Create PDF"; isEnabled = false; setOnClickListener { if (operation == "split" || (operation == "pages" && splitMode)) chooseSplitFolder() else processFiles() } }
         runButton.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(242, 90, 96))
         runButton.setTextColor(Color.WHITE)
         layout.addView(runButton)
@@ -114,8 +115,24 @@ class ToolActivity : Activity() {
             inputType = android.text.InputType.TYPE_CLASS_TEXT
             setSingleLine(true)
         }
-        pagesInput.visibility = if (operation == "split") android.view.View.VISIBLE else android.view.View.GONE
+        pagesInput.visibility = if (operation == "split" || operation == "pages") android.view.View.VISIBLE else android.view.View.GONE
         if (operation == "split") pagesInput.hint = "Split after pages, e.g. 5,12 (20 pages → 1-5, 6-12, 13-20)"
+        if (operation == "pages") {
+            val modes = Spinner(this)
+            modes.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item,
+                listOf("Extract selected pages (one PDF)", "Split at page numbers (multiple PDFs)"))
+            layout.addView(modes)
+            modes.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+                override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+                override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                    splitMode = position == 1
+                    pagesInput.hint = if (splitMode) "Split after pages: 5,12" else "Extract pages: 1,3,5-8"
+                    runButton.text = if (splitMode) "Save split PDFs to folder" else "Extract pages"
+                    if (::saveButton.isInitialized) saveButton.visibility = if (splitMode) android.view.View.GONE else android.view.View.VISIBLE
+                    if (::previewButton.isInitialized) previewButton.visibility = if (splitMode) android.view.View.GONE else android.view.View.VISIBLE
+                }
+            }
+        }
         layout.addView(pagesInput)
 
         status = TextView(this).apply { text = "Choose a tool to begin."; textSize = 15f; setPadding(0, 30, 0, 16) }
@@ -124,6 +141,12 @@ class ToolActivity : Activity() {
         layout.addView(saveButton)
         previewButton = Button(this).apply { text = "Preview PDF result"; isEnabled = false; setOnClickListener { result?.let { preview(it) } } }
         layout.addView(previewButton)
+        if (operation == "pages") layout.addView(Button(this).apply {
+            text = "Visual page selection and organization"
+            setOnClickListener {
+                startActivity(Intent(this@ToolActivity, PageEditorActivity::class.java).putExtra("tool", "extract"))
+            }
+        })
         val scroll = ScrollView(this)
         scroll.addView(layout)
         setContentView(scroll)
@@ -337,7 +360,7 @@ class ToolActivity : Activity() {
                     when (activeOperation) {
                         "images" -> imagesToPdf(uris, file)
                         "merge" -> mergePdfs(uris, file)
-                        "extract" -> extractPages(uris.first(), file, pageSelection)
+                        "extract", "pages" -> extractPages(uris.first(), file, pageSelection)
                         "split" -> splitPages(uris.first(), file)
                         "compress" -> renderToPdf(uris, file, 55, false)
                     }
