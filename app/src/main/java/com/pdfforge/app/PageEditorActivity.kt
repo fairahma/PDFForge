@@ -115,7 +115,7 @@ class PageEditorActivity : Activity() {
         info.setPadding(0, dp(20), 0, dp(12))
         outer.addView(info)
         val workspace = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val railScroll = ScrollView(this).apply { background = rounded(ThemePrefs.surface(this), 14) }
+        val railScroll = ScrollView(this).apply { background = rounded(ThemePrefs.surface(this@PageEditorActivity), 14) }
         grid = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(5), dp(8), dp(5), dp(8))
@@ -131,13 +131,13 @@ class PageEditorActivity : Activity() {
             setPadding(dp(4), 0, 0, dp(8))
         }
         viewer.addView(pageTitle)
-        val pageScroll = ScrollView(this).apply { fillViewport = true }
+        val pageScroll = ScrollView(this).apply { isFillViewport = true }
         canvas = ImageView(this).apply {
             scaleType = ImageView.ScaleType.FIT_CENTER
             adjustViewBounds = true
             setBackgroundColor(Color.WHITE)
         }
-        pageScroll.addView(canvas, ScrollView.LayoutParams(-1, -2))
+        pageScroll.addView(canvas, LinearLayout.LayoutParams(-1, -2))
         viewer.addView(pageScroll, LinearLayout.LayoutParams(-1, 0, 1f))
         val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         val remove = Button(this).apply {
