@@ -285,7 +285,7 @@ class PageEditorActivity : Activity() {
             val tile = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(5), dp(5), dp(5), dp(7))
-                background = rounded(if (index == activePage) Color.rgb(65, 85, 147) else ThemePrefs.surface(this), 10)
+                background = rounded(if (index == activePage) Color.rgb(65, 85, 147) else ThemePrefs.surface(this@PageEditorActivity), 10)
             }
             val thumb = ImageView(this).apply {
                 scaleType = ImageView.ScaleType.FIT_CENTER
