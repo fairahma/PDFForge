@@ -652,7 +652,7 @@ class ToolActivity : Activity() {
                                 renderer.openPage(i).use { src ->
                                     val width = (src.width * if (quality < 100) 0.7 else 1.0).toInt().coerceAtLeast(1)
                                     val height = (src.height * if (quality < 100) 0.7 else 1.0).toInt().coerceAtLeast(1)
-                                    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+                                    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                                     bitmap.eraseColor(Color.WHITE)
                                     src.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                                     val page = doc.startPage(PdfDocument.PageInfo.Builder(src.width, src.height, pageNumber++).create())
@@ -679,7 +679,7 @@ class ToolActivity : Activity() {
                         renderer.openPage(index).use { original ->
                             val w = (original.width * scale).toInt().coerceAtLeast(1)
                             val h = (original.height * scale).toInt().coerceAtLeast(1)
-                            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565)
+                            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                             try {
                                 bitmap.eraseColor(Color.WHITE)
                                 original.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
