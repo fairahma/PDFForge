@@ -128,5 +128,6 @@ class MainActivity : Activity() {
         val scroll = ScrollView(this)
         scroll.addView(root)
         setContentView(scroll)
+        SafeArea.apply(this, scroll)
     }
 }
