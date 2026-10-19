@@ -62,7 +62,7 @@ class MainActivity : Activity() {
             background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(32, 63, 76), Color.rgb(27, 93, 97))).apply { cornerRadius = dp(20).toFloat() }
         }
         hero.addView(TextView(this).apply {
-            text = "All the PDF tools you need"
+            text = "Your documents, simplified"
             textSize = 21f
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             setTextColor(Color.WHITE)
@@ -75,9 +75,9 @@ class MainActivity : Activity() {
         })
         root.addView(hero)
         root.addView(TextView(this).apply {
-            text = "YOUR TOOLS"
+            text = "TOOLS"
             textSize = 13f
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             setTextColor(blue)
             setPadding(0, dp(28), 0, dp(14))
         })
