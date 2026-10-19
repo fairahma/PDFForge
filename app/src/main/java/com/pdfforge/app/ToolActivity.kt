@@ -37,6 +37,7 @@ class ToolActivity : Activity() {
     private lateinit var previewButton: Button
     private lateinit var pagesInput: EditText
     private var splitMode = false
+    private var compressionLevel = 0
     private var resultIsZip = false
     private lateinit var filesPanel: LinearLayout
     private lateinit var runButton: Button
@@ -134,6 +135,16 @@ class ToolActivity : Activity() {
             }
         }
         layout.addView(pagesInput)
+        if (operation == "compress") {
+            val levels = Spinner(this)
+            levels.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, listOf("Low - lossless", "Medium - balanced", "High - smallest"))
+            levels.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+                override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+                override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) { compressionLevel = position }
+            }
+            layout.addView(levels)
+            layout.addView(TextView(this).apply { text = "Medium and High flatten pages; selectable text may be lost."; setTextColor(Color.WHITE) })
+        }
 
         status = TextView(this).apply { text = "Choose a tool to begin."; textSize = 15f; setPadding(0, 30, 0, 16) }
         layout.addView(status)
@@ -353,6 +364,7 @@ class ToolActivity : Activity() {
         previewButton.isEnabled = false
         val pageSelection = pagesInput.text.toString()
         val activeOperation = operation
+        val selectedCompression = compressionLevel
         thread {
                 try {
                     val zip = activeOperation == "split"
@@ -362,7 +374,7 @@ class ToolActivity : Activity() {
                         "merge" -> mergePdfs(uris, file)
                         "extract", "pages" -> extractPages(uris.first(), file, pageSelection)
                         "split" -> splitPages(uris.first(), file)
-                        "compress" -> compressPdf(uris.first(), file)
+                        "compress" -> compressPdf(uris.first(), file, selectedCompression)
                     }
                     result = file
                     resultIsZip = zip
@@ -548,10 +560,12 @@ class ToolActivity : Activity() {
 
     // Android's built-in PDF APIs render pages to images. This is a rasterized
     // implementation: selectable text, vector graphics and links are not preserved.
-    private fun compressPdf(uri: Uri, output: File) {
+    private fun compressPdf(uri: Uri, output: File, level: Int) {
         val source = copySource(uri)
         try {
-            PDDocument.load(source).use { document ->
+            if (level > 0) {
+                compressRaster(source, output, level)
+            } else PDDocument.load(source).use { document ->
                 // Lossless PDF rewrite: preserve selectable text, vector graphics,
                 // annotations, and original image resolution.
                 document.isAllSecurityToBeRemoved = true
@@ -597,4 +611,39 @@ class ToolActivity : Activity() {
             FileOutputStream(file).use { doc.writeTo(it) }
         } finally { doc.close() }
     }
+    private fun compressRaster(source: File, output: File, level: Int) {
+        val quality = if (level == 1) 65 else 35
+        val scale = if (level == 1) 1.2f else 0.8f
+        PDDocument().use { compressed ->
+            ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+                PdfRenderer(fd).use { renderer ->
+                    for (index in 0 until renderer.pageCount) {
+                        renderer.openPage(index).use { original ->
+                            val w = (original.width * scale).toInt().coerceAtLeast(1)
+                            val h = (original.height * scale).toInt().coerceAtLeast(1)
+                            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565)
+                            try {
+                                bitmap.eraseColor(Color.WHITE)
+                                original.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                val bytes = java.io.ByteArrayOutputStream().use { stream ->
+                                    bitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)
+                                    stream.toByteArray()
+                                }
+                                val page = com.tom_roush.pdfbox.pdmodel.PDPage(
+                                    com.tom_roush.pdfbox.pdmodel.common.PDRectangle(original.width.toFloat(), original.height.toFloat())
+                                )
+                                compressed.addPage(page)
+                                val image = com.tom_roush.pdfbox.pdmodel.graphics.image.JPEGFactory.createFromByteArray(compressed, bytes)
+                                com.tom_roush.pdfbox.pdmodel.PDPageContentStream(compressed, page).use { canvas ->
+                                    canvas.drawImage(image, 0f, 0f, original.width.toFloat(), original.height.toFloat())
+                                }
+                            } finally { bitmap.recycle() }
+                        }
+                    }
+                }
+            }
+            compressed.save(output)
+        }
+    }
+
 }
