@@ -677,7 +677,7 @@ class ToolActivity : Activity() {
                         renderer.openPage(index).use { original ->
                             val w = (original.width * scale).toInt().coerceAtLeast(1)
                             val h = (original.height * scale).toInt().coerceAtLeast(1)
-                            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565)
+                            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                             try {
                                 bitmap.eraseColor(Color.WHITE)
                                 original.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
