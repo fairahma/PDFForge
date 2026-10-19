@@ -32,6 +32,10 @@ class PageEditorActivity : Activity() {
     private var renderGeneration = 0
     private lateinit var info: TextView
     private lateinit var save: Button
+    private lateinit var editorWorkspace: LinearLayout
+    private lateinit var emptyState: LinearLayout
+    private lateinit var editorToolbar: LinearLayout
+    private var editorOptions: View? = null
     private var extractInput: EditText? = null
     private var output: File? = null
     private var mode = "organize"
@@ -84,6 +88,7 @@ class PageEditorActivity : Activity() {
         preview.background = rounded(Color.rgb(41, 63, 98), 12)
         preview.setTextColor(Color.WHITE)
         outer.addView(toolbar)
+        editorToolbar = toolbar
         if (mode == "extract") {
             val switcher = RadioGroup(this).apply { orientation = RadioGroup.HORIZONTAL }
             val extractRadio = RadioButton(this).apply {
@@ -95,6 +100,7 @@ class PageEditorActivity : Activity() {
             switcher.addView(extractRadio)
             switcher.addView(splitRadio)
             outer.addView(switcher)
+            editorOptions = switcher
             switcher.setOnCheckedChangeListener { _, checked ->
                 splitMode = checked == splitRadio.id
                 extractInput?.hint = if (splitMode) "Split after page numbers: 3,7" else "Extract: 1,3,5-8"
@@ -165,7 +171,46 @@ class PageEditorActivity : Activity() {
         actions.addView(view, LinearLayout.LayoutParams(0, dp(44), 1f).apply { leftMargin = dp(8) })
         viewer.addView(actions)
         workspace.addView(viewer, LinearLayout.LayoutParams(0, -1, 1f))
+        editorWorkspace = workspace
         outer.addView(workspace, LinearLayout.LayoutParams(-1, 0, 1f))
+        emptyState = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(26), dp(30), dp(26), dp(30))
+        }
+        emptyState.addView(ImageView(this).apply {
+            setImageResource(when (mode) {
+                "merge" -> R.drawable.ic_merge_pdf
+                "extract" -> R.drawable.ic_split_pdf
+                else -> R.drawable.ic_organize_pdf
+            })
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }, LinearLayout.LayoutParams(dp(116), dp(116)))
+        emptyState.addView(label(when (mode) {
+            "merge" -> "Ready to merge PDFs?"
+            "extract" -> "Choose a PDF to split"
+            else -> "Organize your PDF"
+        }, 21f).apply {
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, dp(22), 0, dp(8))
+        })
+        emptyState.addView(label(when (mode) {
+            "merge" -> "Select PDF files to combine and rearrange their pages."
+            "extract" -> "Select a PDF to extract pages or split it into separate files."
+            else -> "Select a PDF to reorder, review or remove pages."
+        }, 14f, ThemePrefs.secondary(this)).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dp(22))
+        })
+        emptyState.addView(Button(this).apply {
+            text = "+  Select PDF"
+            isAllCaps = false
+            setTextColor(Color.WHITE)
+            background = rounded(Color.rgb(104, 75, 224), 14)
+            setOnClickListener { pickFiles() }
+        }, LinearLayout.LayoutParams(-1, dp(54)))
+        outer.addView(emptyState, LinearLayout.LayoutParams(-1, 0, 1f))
         save = Button(this).apply {
             text = if (mode == "merge") "Review & save merged PDF" else if (mode == "extract") "Extract selected pages" else "Review & save PDF"
             isAllCaps = false
@@ -177,7 +222,17 @@ class PageEditorActivity : Activity() {
         outer.addView(save, LinearLayout.LayoutParams(-1, dp(54)).apply { topMargin = dp(10) })
         setContentView(outer)
         SafeArea.apply(this, outer)
-        pickFiles()
+        updateEmptyState()
+    }
+    private fun updateEmptyState() {
+        val hasPages = pages.isNotEmpty()
+        emptyState.visibility = if (hasPages) View.GONE else View.VISIBLE
+        editorWorkspace.visibility = if (hasPages) View.VISIBLE else View.GONE
+        editorToolbar.visibility = if (hasPages) View.VISIBLE else View.GONE
+        editorOptions?.visibility = if (hasPages) View.VISIBLE else View.GONE
+        extractInput?.visibility = if (hasPages) View.VISIBLE else View.GONE
+        info.visibility = if (hasPages) View.VISIBLE else View.GONE
+        save.visibility = if (hasPages) View.VISIBLE else View.GONE
     }
     private fun pickFiles() {
         val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -276,6 +331,7 @@ class PageEditorActivity : Activity() {
         grid.removeAllViews()
         info.text = "${pages.size} PAGES  •  Hold a page, then drag onto a highlighted thumbnail"
         save.isEnabled = pages.isNotEmpty()
+        updateEmptyState()
         if (pages.isEmpty()) {
             pageTitle.text = "No pages selected"
             canvas.setImageDrawable(null)
