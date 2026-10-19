@@ -63,9 +63,8 @@ class MainActivity : Activity() {
         })
         val tools = listOf(
             Triple("📑", "Merge PDFs", "merge"),
+            Triple("✂️", "Split / Extract", "pages"),
             Triple("🗂", "Organize", "organize"),
-            Triple("📤", "Extract pages", "extract"),
-            Triple("✂️", "Split PDF", "split"),
             Triple("🗜", "Compress", "compress"),
             Triple("🖼", "Images to PDF", "images")
         )
@@ -79,7 +78,7 @@ class MainActivity : Activity() {
                 background = shape(Color.rgb(35, 53, 82), 18)
                 elevation = dp(2).toFloat()
                 setOnClickListener {
-                    val destination = if (op == "merge" || op == "organize" || op == "extract") PageEditorActivity::class.java else ToolActivity::class.java
+                    val destination = if (op == "merge" || op == "organize") PageEditorActivity::class.java else ToolActivity::class.java
                     startActivity(Intent(this@MainActivity, destination).putExtra("tool", op))
                 }
             }
