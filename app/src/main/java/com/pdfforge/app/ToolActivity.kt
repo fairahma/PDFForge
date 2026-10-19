@@ -79,11 +79,11 @@ class ToolActivity : Activity() {
                 }
             }
             card.addView(TextView(this).apply { text = title; textSize = 19f; setTextColor(ThemePrefs.foreground(this@ToolActivity)) })
-            card.addView(TextView(this).apply { text = subtitle; textSize = 13f; setTextColor(Color.rgb(205, 219, 239)) })
+            card.addView(TextView(this).apply { text = subtitle; textSize = 13f; setTextColor(ThemePrefs.secondary(this@ToolActivity)) })
             return card
         }
         layout.addView(TextView(this).apply { text = "‹  " + when(operation) { "compress" -> "Compress PDF"; "pages" -> "Split / Extract"; else -> "Images to PDF" }; textSize = 26f; setTextColor(ThemePrefs.foreground(this@ToolActivity)); setPadding(0, 0, 0, 8); setOnClickListener { finish() } })
-        layout.addView(TextView(this).apply { text = "Private, offline document workspace"; textSize = 15f; setTextColor(Color.rgb(205, 219, 239)); setPadding(0, 0, 0, 22) })
+        layout.addView(TextView(this).apply { text = "Private, offline document workspace"; textSize = 15f; setTextColor(ThemePrefs.secondary(this@ToolActivity)); setPadding(0, 0, 0, 22) })
         
         workspace = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -116,7 +116,7 @@ class ToolActivity : Activity() {
         runButton.setTextColor(Color.WHITE)
         layout.addView(runButton)
         pagesInput = EditText(this).apply {
-            setTextColor(Color.WHITE)
+            setTextColor(ThemePrefs.foreground(this@ToolActivity))
             setHintTextColor(Color.rgb(179, 194, 220))
             hint = "Pages to extract: e.g. 1,3-5 (blank = all)"
             inputType = android.text.InputType.TYPE_CLASS_TEXT
@@ -145,14 +145,14 @@ class ToolActivity : Activity() {
             layout.addView(TextView(this).apply {
                 text = "2  CHOOSE COMPRESSION"
                 textSize = 17f
-                setTextColor(Color.WHITE)
+                setTextColor(ThemePrefs.foreground(this@ToolActivity))
                 setPadding(0, 22, 0, 12)
             })
             val choices = RadioGroup(this).apply {
                 orientation = RadioGroup.VERTICAL
                 setPadding(18, 14, 18, 14)
                 background = GradientDrawable().apply {
-                    setColor(Color.rgb(35, 53, 82))
+                    setColor(ThemePrefs.surface(this@ToolActivity))
                     cornerRadius = 22f
                 }
             }
@@ -167,7 +167,7 @@ class ToolActivity : Activity() {
                     id = View.generateViewId().also { choiceIds.add(it) }
                     text = title
                     textSize = 15f
-                    setTextColor(Color.WHITE)
+                    setTextColor(ThemePrefs.foreground(this@ToolActivity))
                     buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(242, 90, 96))
                     setPadding(8, 12, 8, 12)
                     isChecked = index == 0
@@ -179,7 +179,7 @@ class ToolActivity : Activity() {
             layout.addView(TextView(this).apply {
                 text = "Medium and High may flatten pages and remove selectable text."
                 textSize = 13f
-                setTextColor(Color.rgb(205, 219, 239))
+                setTextColor(ThemePrefs.secondary(this@ToolActivity))
                 setPadding(0, 12, 0, 18)
             })
             (runButton.parent as? ViewGroup)?.removeView(runButton)
@@ -203,6 +203,7 @@ class ToolActivity : Activity() {
         val scroll = ScrollView(this)
         scroll.addView(layout)
         setContentView(scroll)
+        SafeArea.apply(this, scroll)
         showSelectedFiles()
         chooseFiles()
     }
