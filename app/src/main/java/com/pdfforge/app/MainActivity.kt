@@ -10,133 +10,146 @@ import android.view.Gravity
 import android.widget.*
 
 class MainActivity : Activity() {
-    private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
-    private fun shape(color: Int, radius: Int) = GradientDrawable().apply {
-        setColor(color)
-        cornerRadius = dp(radius).toFloat()
-    }
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+
+    private data class Tool(
+        val title: String, val subtitle: String, val operation: String,
+        val icon: Int, val start: Int, val end: Int
+    )
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val navy = ThemePrefs.foreground(this)
-        val blue = ThemePrefs.accent
+        val dark = ThemePrefs.dark(this)
+        val foreground = ThemePrefs.foreground(this)
+        val background = ThemePrefs.background(this)
+        window.statusBarColor = background
+        window.navigationBarColor = background
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(26), dp(18), dp(24))
-            setBackgroundColor(ThemePrefs.background(this@MainActivity))
+            setPadding(dp(18), dp(16), dp(18), dp(20))
+            setBackgroundColor(background)
         }
-        root.addView(TextView(this).apply {
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        header.addView(TextView(this).apply {
             text = "PDFForge"
             textSize = 29f
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            setTextColor(navy)
-        })
-        val settings = TextView(this).apply {
-            text = "Appearance  ⚙"
-            textSize = 14f
-            gravity = Gravity.END
-            setTextColor(ThemePrefs.accent)
-            setPadding(0, 0, 0, dp(10))
+            typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+            setTextColor(foreground)
+        }, LinearLayout.LayoutParams(0, dp(54), 1f))
+        header.addView(TextView(this).apply {
+            text = "⚙"
+            textSize = 27f
+            gravity = Gravity.CENTER
+            setTextColor(foreground)
+            contentDescription = "Appearance settings"
             setOnClickListener {
-                val modes = arrayOf("Follow system", "Light", "Dark")
+                val choices = arrayOf("Follow system", "Light", "Dark")
                 val values = arrayOf("system", "light", "dark")
-                val current = values.indexOf(ThemePrefs.mode(this@MainActivity)).coerceAtLeast(0)
+                val selected = values.indexOf(ThemePrefs.mode(this@MainActivity)).coerceAtLeast(0)
                 android.app.AlertDialog.Builder(this@MainActivity)
-                    .setTitle("App appearance")
-                    .setSingleChoiceItems(modes, current) { dialog, index ->
+                    .setTitle("Appearance")
+                    .setSingleChoiceItems(choices, selected) { dialog, index ->
                         ThemePrefs.set(this@MainActivity, values[index])
                         dialog.dismiss()
                         recreate()
                     }.setNegativeButton("Cancel", null).show()
             }
-        }
-        root.addView(settings)
+        }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        root.addView(header)
         root.addView(TextView(this).apply {
-            text = "Your PDF studio • Private & offline"
-            textSize = 15f
-            setTextColor(ThemePrefs.secondary(this@MainActivity))
-            setPadding(0, dp(5), 0, dp(22))
-        })
-        val hero = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(22), dp(24), dp(22), dp(24))
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(32, 63, 76), Color.rgb(27, 93, 97))).apply { cornerRadius = dp(20).toFloat() }
-        }
-        hero.addView(TextView(this).apply {
-            text = "Your documents, simplified"
-            textSize = 21f
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            setTextColor(Color.WHITE)
-        })
-        hero.addView(TextView(this).apply {
-            text = "Fast, simple and secure. Everything stays on your device."
-            textSize = 14f
-            setTextColor(Color.rgb(218, 231, 255))
-            setPadding(0, dp(10), 0, 0)
-        })
-        root.addView(hero)
-        root.addView(TextView(this).apply {
-            text = "TOOLS"
+            text = "Your PDF studio  •  Private & offline"
             textSize = 13f
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            setTextColor(blue)
-            setPadding(0, dp(28), 0, dp(14))
+            setTextColor(ThemePrefs.secondary(this@MainActivity))
+            setPadding(dp(2), 0, 0, dp(16))
+        })
+        root.addView(TextView(this).apply {
+            text = "ALL TOOLS"
+            textSize = 12f
+            letterSpacing = 0.13f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(if (dark) Color.rgb(190, 199, 222) else Color.rgb(87, 99, 120))
+            setPadding(dp(2), dp(4), 0, dp(12))
         })
         val tools = listOf(
-            Triple("▤", "Merge PDFs", "merge"),
-            Triple("✂", "Split / Extract", "pages"),
-            Triple("▥", "Organize", "organize"),
-            Triple("⇣", "Compress", "compress"),
-            Triple("▧", "Images to PDF", "images")
+            Tool("Images to PDF", "Convert your photos into a PDF", "images", R.drawable.ic_image_to_pdf, Color.rgb(255, 110, 102), Color.rgb(218, 28, 106)),
+            Tool("Merge PDFs", "Combine multiple PDFs into one", "merge", R.drawable.ic_merge_pdf, Color.rgb(167, 74, 245), Color.rgb(72, 32, 209)),
+            Tool("Split / Extract", "Select pages or split documents", "pages", R.drawable.ic_split_pdf, Color.rgb(48, 219, 148), Color.rgb(0, 151, 169)),
+            Tool("Compress PDF", "Reduce file size, keep quality", "compress", R.drawable.ic_compress_pdf, Color.rgb(255, 194, 49), Color.rgb(248, 91, 39)),
+            Tool("Organize PDF", "Reorder, rotate and remove pages", "organize", R.drawable.ic_organize_pdf, Color.rgb(255, 80, 167), Color.rgb(194, 26, 128))
         )
-        val grid = GridLayout(this).apply { columnCount = 2 }
-        val width = (resources.displayMetrics.widthPixels - dp(52)) / 2
-        tools.forEach { (_, name, op) ->
+        tools.forEach { tool ->
             val card = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
+                orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(17), dp(18), dp(12), dp(18))
-                background = shape(if (ThemePrefs.dark(this@MainActivity)) Color.rgb(28, 40, 55) else Color.WHITE, 18)
-                elevation = dp(2).toFloat()
+                setPadding(dp(14), dp(14), dp(12), dp(14))
+                background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(tool.start, tool.end)).apply {
+                    cornerRadius = dp(19).toFloat()
+                }
+                elevation = dp(3).toFloat()
+                isClickable = true
+                isFocusable = true
+                contentDescription = "${tool.title}. ${tool.subtitle}"
                 setOnClickListener {
-                    val destination = if (op == "merge" || op == "organize" || op == "pages") PageEditorActivity::class.java else ToolActivity::class.java
-                    startActivity(Intent(this@MainActivity, destination).putExtra("tool", if (op == "pages") "extract" else op))
+                    val destination = if (tool.operation in listOf("merge", "organize", "pages")) PageEditorActivity::class.java else ToolActivity::class.java
+                    val operation = if (tool.operation == "pages") "extract" else tool.operation
+                    startActivity(Intent(this@MainActivity, destination).putExtra("tool", operation))
                 }
             }
-            val iconId = when(op) {
-                "merge" -> R.drawable.ic_merge_pdf
-                "pages" -> R.drawable.ic_split_pdf
-                "organize" -> R.drawable.ic_organize_pdf
-                "compress" -> R.drawable.ic_compress_pdf
-                else -> R.drawable.ic_image_to_pdf
-            }
             card.addView(ImageView(this).apply {
-                setImageResource(iconId)
+                setImageResource(tool.icon)
                 scaleType = ImageView.ScaleType.FIT_CENTER
-                contentDescription = "$name icon"
-            }, LinearLayout.LayoutParams(dp(62), dp(62)))
-            card.addView(TextView(this).apply {
-                text = name
-                textSize = 15f
-                typeface = Typeface.DEFAULT_BOLD
-                setTextColor(ThemePrefs.foreground(this@MainActivity))
-                setPadding(0, dp(12), 0, 0)
+                contentDescription = null
+            }, LinearLayout.LayoutParams(dp(68), dp(68)))
+            val labels = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), 0, dp(6), 0)
+            }
+            labels.addView(TextView(this).apply {
+                text = tool.title
+                textSize = 18f
+                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                setTextColor(Color.WHITE)
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
             })
-            card.addView(TextView(this).apply { text = when(op) { "merge" -> "Combine documents"; "pages" -> "Select or split pages"; "organize" -> "Reorder and remove"; "compress" -> "Reduce file size"; else -> "Convert photos" }; textSize = 11f; setTextColor(ThemePrefs.secondary(this@MainActivity)); setPadding(0, dp(6), 0, 0) })
-            grid.addView(card, GridLayout.LayoutParams().apply {
-                this.width = width - dp(8)
-                height = dp(132)
-                setMargins(dp(4), dp(5), dp(4), dp(5))
+            labels.addView(TextView(this).apply {
+                text = tool.subtitle
+                textSize = 12f
+                setTextColor(Color.rgb(255, 247, 251))
+                maxLines = 2
+                setPadding(0, dp(5), 0, 0)
+            })
+            card.addView(labels, LinearLayout.LayoutParams(0, -2, 1f))
+            card.addView(TextView(this).apply {
+                text = "›"
+                textSize = 32f
+                gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                background = GradientDrawable().apply {
+                    setColor(0x35FFFFFF)
+                    shape = GradientDrawable.OVAL
+                }
+            }, LinearLayout.LayoutParams(dp(34), dp(34)))
+            root.addView(card, LinearLayout.LayoutParams(-1, dp(110)).apply {
+                bottomMargin = dp(12)
             })
         }
-        root.addView(grid)
         root.addView(TextView(this).apply {
-            text = "Private by design • Files stay on your device"
-            textSize = 12f
+            text = "Private by design  •  Files stay on your device"
+            textSize = 11f
             gravity = Gravity.CENTER
             setTextColor(ThemePrefs.secondary(this@MainActivity))
-            setPadding(0, dp(24), 0, 0)
+            setPadding(0, dp(10), 0, dp(8))
         })
-        val scroll = ScrollView(this).apply { setBackgroundColor(ThemePrefs.background(this@MainActivity)); isFillViewport = true }
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            setBackgroundColor(background)
+            clipToPadding = false
+        }
         scroll.addView(root)
         setContentView(scroll)
         SafeArea.apply(this, scroll)
