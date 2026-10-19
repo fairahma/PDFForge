@@ -273,7 +273,7 @@ class PageEditorActivity : Activity() {
     }
     private fun refresh() {
         grid.removeAllViews()
-        info.text = "${pages.size} PAGES  •  Long-press thumbnails to reorder"
+        info.text = "${pages.size} PAGES  •  Hold a page, then drag onto a highlighted thumbnail"
         save.isEnabled = pages.isNotEmpty()
         if (pages.isEmpty()) {
             pageTitle.text = "No pages selected"
@@ -301,18 +301,45 @@ class PageEditorActivity : Activity() {
                 tile.startDragAndDrop(ClipData.newPlainText("page", index.toString()), View.DragShadowBuilder(tile), index, 0)
                 true
             }
+            val normalBackground = tile.background
+            val dropBackground = GradientDrawable().apply {
+                setColor(if (ThemePrefs.dark(this@PageEditorActivity)) Color.rgb(43, 58, 98) else Color.rgb(231, 225, 255))
+                cornerRadius = dp(10).toFloat()
+                setStroke(dp(3), Color.rgb(117, 91, 255))
+            }
+            val positionLabel = tile.getChildAt(1) as TextView
             tile.setOnDragListener { _, event ->
-                if (event.action == DragEvent.ACTION_DROP) {
-                    val from = event.localState as? Int ?: return@setOnDragListener true
-                    if (from in pages.indices && index in pages.indices && from != index) {
-                        val moved = pages.removeAt(from)
-                        pages.add(index, moved)
-                        activePage = index
-                        output = null
-                        refresh()
+                when (event.action) {
+                    DragEvent.ACTION_DRAG_STARTED -> true
+                    DragEvent.ACTION_DRAG_ENTERED -> {
+                        val from = event.localState as? Int
+                        if (from != null && from != index) {
+                            tile.background = dropBackground
+                            positionLabel.text = "Drop here ↓"
+                            positionLabel.setTextColor(if (ThemePrefs.dark(this@PageEditorActivity)) Color.WHITE else Color.rgb(75, 53, 191))
+                        }
+                        true
                     }
+                    DragEvent.ACTION_DRAG_EXITED, DragEvent.ACTION_DRAG_ENDED -> {
+                        tile.background = normalBackground
+                        positionLabel.text = "${index + 1}  ⋮"
+                        positionLabel.setTextColor(if (index == activePage) Color.WHITE else navy)
+                        true
+                    }
+                    DragEvent.ACTION_DROP -> {
+                        val from = event.localState as? Int
+                        if (from != null && from in pages.indices && index in pages.indices && from != index) {
+                            val moved = pages.removeAt(from)
+                            pages.add(index, moved)
+                            activePage = index
+                            output = null
+                            refresh()
+                            info.text = "Moved page ${from + 1} to position ${index + 1}"
+                        }
+                        true
+                    }
+                    else -> true
                 }
-                true
             }
             grid.addView(tile, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
             thread {
